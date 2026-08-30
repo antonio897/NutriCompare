@@ -1,0 +1,6 @@
+{
+  "name": "NutriCompare",
+  "description": "Plataforma de análisis clínico y comparativa de suplementos nutricionales con algoritmo NutriScore.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
