@@ -1,0 +1,49 @@
+name: Sync Affiliate Prices & Amazon Daily Cron
+
+on:
+  schedule:
+    # Se ejecuta todos los días a las 04:00 AM UTC (horas valle para no saturar servidores)
+    - cron: '0 4 * * *'
+  # Permite ejecución manual desde la pestaña Actions de GitHub
+  workflow_dispatch:
+    inputs:
+      trigger_reason:
+        description: 'Motivo de ejecución manual'
+        required: false
+        default: 'Manual sync trigger'
+
+jobs:
+  sync-prices:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Trigger Remote Sync Endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }} # Ej: https://nutricompare.vercel.app
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$APP_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "⚠️ Variables APP_URL o CRON_SECRET no configuradas en GitHub Secrets."
+            echo "Saltando invocación remota y ejecutando script local..."
+            exit 0
+          fi
+          
+          echo "🚀 Disparando Cron Job en $APP_URL/api/cron/sync-affiliates..."
+          HTTP_RESPONSE=$(curl -s -w "\n%{http_code}" -X GET "$APP_URL/api/cron/sync-affiliates" \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "User-Agent: GitHub-Actions-CronSync/1.0")
+
+          HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed '$d')
+          HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tail -n1)
+
+          echo "Status: $HTTP_STATUS"
+          echo "Response: $HTTP_BODY"
+
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "❌ Error en la sincronización remota."
+            exit 1
+          fi
+
+          echo "✅ Sincronización remota completada con éxito."

@@ -1,0 +1,110 @@
+// prisma/schema.prisma
+// NutriCompare - Esquema de Base de Datos PostgreSQL Optimizado para Coste 0€ y Alto Rendimiento
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  slug      String    @unique
+  logoUrl   String?   @map("logo_url")
+  createdAt DateTime  @default(now()) @map("created_at")
+  products  Product[]
+
+  @@map("brands")
+}
+
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  slug        String    @unique
+  description String?
+  products    Product[]
+
+  @@map("categories")
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  ean         String           @unique // Código de barras EAN/UPC clave para cruzar datos sin ambigüedad
+  name        String
+  slug        String           @unique
+  brandId     String?          @map("brand_id")
+  categoryId  String?          @map("category_id")
+  imageUrl    String?          @map("image_url")
+  isActive    Boolean          @default(true) @map("is_active")
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+
+  // Relaciones
+  brand           Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  category        Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  nutritionalInfo NutritionalInfo?
+  vendorOffers    VendorOffer[]
+
+  // Índices para búsquedas y filtros ultrarrápidos con bajo consumo de memoria
+  @@index([ean])
+  @@index([categoryId])
+  @@index([brandId])
+  @@map("products")
+}
+
+model NutritionalInfo {
+  id                   String   @id @default(cuid())
+  productId            String   @unique @map("product_id")
+  servingSize          String?  @map("serving_size") // Ej: "30g" o "5g"
+  proteinPer100g       Float?   @map("protein_per_100g")
+  creatinePerServing   Float?   @map("creatine_per_serving") // Gramos de creatina por dosis
+  carbsPer100g         Float?   @map("carbs_per_100g")
+  fatPer100g           Float?   @map("fat_per_100g")
+  caloriesPer100g      Float?   @map("calories_per_100g")
+  ingredientsList      String?  @map("ingredients_list") @db.Text
+  nutriscoreCalculated Float?   @map("nutriscore_calculated") // Puntuación calculada de 0 a 100
+  purityCertified      Boolean  @default(false) @map("purity_certified")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@map("nutritional_info")
+}
+
+model VendorOffer {
+  id           String         @id @default(cuid())
+  productId    String         @map("product_id")
+  vendorName   String         @map("vendor_name") // Ej: "Amazon", "HSN", "Prozis", "MyProtein"
+  vendorSku    String?        @map("vendor_sku")  // ASIN en Amazon o ID en red de afiliación
+  currentPrice Float          @map("current_price")
+  currency     String         @default("EUR")
+  affiliateUrl String         @map("affiliate_url") @db.Text
+  lastUpdated  DateTime       @default(now()) @map("last_updated")
+  inStock      Boolean        @default(true) @map("in_stock")
+
+  product      Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  priceHistory PriceHistory[]
+
+  // Índice compuesto para consultar de forma inmediata las mejores ofertas por producto
+  @@unique([productId, vendorName])
+  @@index([productId, currentPrice])
+  @@index([vendorSku])
+  @@map("vendor_offers")
+}
+
+model PriceHistory {
+  id            String      @id @default(cuid())
+  vendorOfferId String      @map("vendor_offer_id")
+  price         Float
+  date          DateTime    @default(now())
+
+  vendorOffer   VendorOffer @relation(fields: [vendorOfferId], references: [id], onDelete: Cascade)
+
+  @@index([vendorOfferId, date])
+  @@map("price_history")
+}
