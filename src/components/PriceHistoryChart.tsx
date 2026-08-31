@@ -29,18 +29,40 @@ export const PriceHistoryChart: React.FC<PriceHistoryChartProps> = ({
   const [selectedTimeframe, setSelectedTimeframe] = useState<'30d' | '90d' | 'all'>('90d');
   const [hoveredPoint, setHoveredPoint] = useState<PricePoint | null>(null);
 
-  // Generar datos simulados de histórico si el producto no tiene suficientes puntos aún
-  const basePrice = currentLowestPrice > 0 ? currentLowestPrice : 24.99;
-  const simulatedHistory: PricePoint[] = history && history.length >= 3 ? history : [
-    { date: '2026-06-01', price: Number((basePrice * 1.15).toFixed(2)), vendor: 'Amazon' },
-    { date: '2026-06-15', price: Number((basePrice * 1.12).toFixed(2)), vendor: 'HSN Store' },
-    { date: '2026-07-01', price: Number((basePrice * 1.08).toFixed(2)), vendor: 'Amazon' },
-    { date: '2026-07-15', price: Number((basePrice * 1.05).toFixed(2)), vendor: 'Prozis' },
-    { date: '2026-08-01', price: Number((basePrice * 1.02).toFixed(2)), vendor: 'HSN Store' },
-    { date: '2026-08-15', price: Number((basePrice * 0.98).toFixed(2)), vendor: 'Amazon' },
-    { date: '2026-08-30', price: Number(basePrice.toFixed(2)), vendor: 'Amazon' },
-  ];
+  const hasRealHistory = history && history.length >= 2;
+  const basePrice = currentLowestPrice > 0 ? currentLowestPrice : 19.99;
 
+  if (!hasRealHistory) {
+    return (
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#e0e3e5] shadow-xs space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#e0e3e5] pb-3">
+          <div className="flex items-center gap-2">
+            <TrendingDown className="w-4 h-4 text-[#006c49]" />
+            <h3 className="text-sm font-bold text-[#191c1e]">Histórico y Evolución de Precio</h3>
+          </div>
+          <span className="text-[11px] text-[#006c49] bg-[#d0fbe4] px-2.5 py-0.5 rounded-full font-bold">
+            ✓ Mejor precio hoy: {formatCurrency(basePrice)}
+          </span>
+        </div>
+        <div className="p-5 rounded-2xl bg-[#f8fafc] border border-[#e0e3e5] flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="space-y-1 text-center sm:text-left">
+            <span className="text-xs font-bold text-[#191c1e] block">Seguimiento de Precios en Vivo Activo</span>
+            <p className="text-[11px] text-[#76777d] max-w-md">
+              Monitorizando Amazon, HSN y tiendas oficiales. La serie temporal detallada se generará automáticamente a medida que se registren fluctuaciones de catálogo.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <span className="text-[10px] text-[#76777d] block uppercase font-medium">Precio Actual</span>
+              <span className="text-xl font-bold text-[#006c49] font-data-tabular">{formatCurrency(basePrice)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const simulatedHistory: PricePoint[] = history;
   const prices = simulatedHistory.map((p) => p.price);
   const minPrice = Math.min(...prices);
   const maxPrice = Math.max(...prices);

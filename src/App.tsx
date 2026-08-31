@@ -17,22 +17,20 @@ import { MethodsView } from './components/MethodsView';
 import { BlogView } from './components/BlogView';
 import { ComparisonFloatingBar } from './components/ComparisonFloatingBar';
 import { ShareModal } from './components/ShareModal';
+import { GlobalSearchModal } from './components/GlobalSearchModal';
 import { Footer } from './components/Footer';
 
 export default function App() {
-  // 🔌 Carga de productos desde Neon PostgreSQL (con fallback automático al mockup)
   // Navigation & View State
   const [currentView, setCurrentView] = useState<string>('directorio');
-  const [selectedProductId, setSelectedProductId] = useState<string | null>('creature-creapure');
+  const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
 
-  // Pre-seed comparison with the 3 creatines from user screenshot
-  const [comparisonIds, setComparisonIds] = useState<string[]>([
-    'creature-creapure',
-    'micronized-creatine-bulk',
-    'standard-creatine-generic',
-  ]);
+  // Lista de comparación dinámica (inicialmente vacía o con los seleccionados)
+  const [comparisonIds, setComparisonIds] = useState<string[]>([]);
+  const [comparisonCache, setComparisonCache] = useState<Record<string, any>>({});
 
-  // Share Modal State
+  // Search Modal & Share Modal State
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
   // Filters State
@@ -48,9 +46,32 @@ export default function App() {
   // Carga reactiva: cuando cambian los filtros, la API devuelve los datos actualizados
   const { products: dbProducts, loading, usingMockData, total: dbTotal, hasMore, loadMore } = useProducts(filters);
 
+  // Atajo global de teclado Ctrl+K / Cmd+K para abrir buscador global
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchModalOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  // Actualizar caché de productos para que los comparados no se pierdan al paginar
+  useEffect(() => {
+    if (dbProducts.length > 0) {
+      setComparisonCache(prev => {
+        const next = { ...prev };
+        dbProducts.forEach(p => { next[p.id] = p; });
+        return next;
+      });
+    }
+  }, [dbProducts]);
+
   const categories: CategoryType[] = ['Creatina', 'Proteína', 'Pre-Entreno', 'Multivitamínico', 'Magnesio', 'Omega-3', 'Aminoácidos'];
 
-  // Toggle supplement in comparison
+  // Toggle supplement in comparison (máximo 4)
   const handleToggleCompare = (id: string) => {
     setComparisonIds((prev) => {
       if (prev.includes(id)) {
@@ -96,7 +117,6 @@ export default function App() {
   };
 
   // Los filtros los gestiona el hook useProducts (API) o el fallback mockup
-  // El filtro de sortBy se aplica en cliente para no añadir latencia extra
   const filteredProducts = [...dbProducts].sort((a, b) => {
     if (filters.sortBy === 'price-asc') return a.price - b.price;
     if (filters.sortBy === 'price-desc') return b.price - a.price;
@@ -104,8 +124,12 @@ export default function App() {
     return b.nutriScore - a.nutriScore; // 'popular' → por score descendente
   });
 
-  const comparedProducts = dbProducts.filter((p) => comparisonIds.includes(p.id));
-  const selectedProduct = dbProducts.find((p) => p.id === selectedProductId) || dbProducts[0];
+  // Reconstruir lista de comparados desde la caché para no perderlos al filtrar o paginar
+  const comparedProducts = comparisonIds
+    .map(id => comparisonCache[id] || dbProducts.find(p => p.id === id))
+    .filter(Boolean);
+
+  const selectedProduct = (selectedProductId ? (comparisonCache[selectedProductId] || dbProducts.find((p) => p.id === selectedProductId)) : null) || dbProducts[0];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f7f9fb] text-[#191c1e]">
@@ -123,6 +147,7 @@ export default function App() {
         onToggleCompare={handleToggleCompare}
         searchQuery={filters.searchQuery}
         onSearchChange={(q) => handleFilterChange({ searchQuery: q })}
+        onOpenSearchModal={() => setIsSearchModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -237,11 +262,21 @@ export default function App() {
         />
       )}
 
+      {/* Global Search Modal (Ctrl+K) */}
+      <GlobalSearchModal
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        products={dbProducts}
+        onSelectProduct={handleSelectProduct}
+        onToggleCompare={handleToggleCompare}
+        comparisonIds={comparisonIds}
+      />
+
       {/* Share Modal */}
       <ShareModal
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
-        products={comparedProducts.length > 0 ? comparedProducts : [selectedProduct]}
+        products={comparedProducts.length > 0 ? comparedProducts : (selectedProduct ? [selectedProduct] : [])}
       />
 
       {/* Global Footer */}

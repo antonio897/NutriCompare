@@ -335,14 +335,29 @@ function mapProductToFrontend(p: {
     ],
     pros: certNames.length > 0 ? [`Certificado con ${certNames[0]}`] : ['Ingrediente de alta biodisponibilidad'],
     contras: p.nutritionalInfo?.additivesCount && p.nutritionalInfo.additivesCount > 2 ? [`Contiene ${p.nutritionalInfo.additivesCount} edulcorantes/aditivos`] : [],
-    purchaseLinks: bestOffer
-      ? [{
-          store: bestOffer.storeName || bestOffer.vendorName || 'Tienda Oficial',
-          url: bestOffer.productUrl || bestOffer.affiliateUrl || '#',
-          price: Number(bestOffer.currentPrice),
+    purchaseLinks: p.vendorOffers && p.vendorOffers.length > 0 && p.vendorOffers[0]?.currentPrice
+      ? p.vendorOffers.map((vo) => ({
+          store: vo.storeName || vo.vendorName || 'Amazon.es',
+          url: vo.productUrl || vo.affiliateUrl || `https://www.amazon.es/s?k=${encodeURIComponent((p.name || '') + ' ' + (p.brand?.name || ''))}&tag=nutricompare-21`,
+          price: Number(vo.currentPrice),
           highlight: true,
-        }]
-      : [],
+        }))
+      : [
+          {
+            store: 'Amazon.es',
+            url: p.ean
+              ? `https://www.amazon.es/s?k=${encodeURIComponent(p.ean)}&tag=nutricompare-21`
+              : `https://www.amazon.es/s?k=${encodeURIComponent((p.name || '') + ' ' + (p.brand?.name || ''))}&tag=nutricompare-21`,
+            price: priceRaw || 19.99,
+            highlight: true,
+          },
+          {
+            store: 'HSN Store',
+            url: `https://www.hsnstore.com/buscar?q=${encodeURIComponent(p.name || '')}`,
+            price: priceRaw ? +(priceRaw * 0.95).toFixed(2) : 18.99,
+            highlight: false,
+          },
+        ],
     algorithmSummary: { plus: `NutriScore ${score}/100`, minus: 'Sin aditivos perjudiciales detectados' },
     rank: 1,
   };

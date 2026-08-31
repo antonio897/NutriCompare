@@ -443,31 +443,61 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
-              <span className="text-[11px] text-[#76777d] block font-medium">Leucina (mTOR)</span>
-              <span className="text-base font-bold text-[#006c49] font-data-tabular">
-                {product.specs.aminogram?.leucine ? `${product.specs.aminogram.leucine}g` : '10.8g'}
-              </span>
-              <span className="text-[10px] text-[#76777d] block">por 100g proteína</span>
-            </div>
+          {/* Si es Proteína o Aminoácidos: Aminograma */}
+          {product.category.toLowerCase().includes('prote') || product.category.toLowerCase().includes('amino') ? (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[11px] text-[#76777d] block font-medium">Leucina (mTOR)</span>
+                <span className="text-base font-bold text-[#006c49] font-data-tabular">
+                  {product.specs.aminogram?.leucine ? `${product.specs.aminogram.leucine}g` : product.purityPct >= 85 ? '≥10.5g' : 'Estándar'}
+                </span>
+                <span className="text-[10px] text-[#76777d] block">por 100g proteína</span>
+              </div>
 
-            <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
-              <span className="text-[11px] text-[#76777d] block font-medium">BCAAs Totales</span>
-              <span className="text-base font-bold text-[#191c1e] font-data-tabular">
-                {product.specs.aminogram?.totalBcaa ? `${product.specs.aminogram.totalBcaa}g` : '22.5g'}
-              </span>
-              <span className="text-[10px] text-[#76777d] block">Ratio 2:1:1</span>
-            </div>
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[11px] text-[#76777d] block font-medium">BCAAs Totales</span>
+                <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                  {product.specs.aminogram?.totalBcaa ? `${product.specs.aminogram.totalBcaa}g` : product.purityPct >= 85 ? '≥22.0g' : 'Ratio 2:1:1'}
+                </span>
+                <span className="text-[10px] text-[#76777d] block">Perfil equilibrado</span>
+              </div>
 
-            <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
-              <span className="text-[11px] text-[#76777d] block font-medium">Glutamina Pura</span>
-              <span className="text-base font-bold text-[#191c1e] font-data-tabular">
-                {product.specs.aminogram?.glutamine ? `${product.specs.aminogram.glutamine}g` : '17.2g'}
-              </span>
-              <span className="text-[10px] text-[#76777d] block">Recuperación</span>
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[11px] text-[#76777d] block font-medium">Concentración Real</span>
+                <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                  {product.purityPct}%
+                </span>
+                <span className="text-[10px] text-[#76777d] block">Densidad activa</span>
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Para otras categorías (Creatina, Magnesio, Pre-entrenos, etc.) */
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[11px] text-[#76777d] block font-medium">Principio Activo</span>
+                <span className="text-sm font-bold text-[#006c49] font-data-tabular truncate block">
+                  {product.activeIngredientAmount || product.category}
+                </span>
+                <span className="text-[10px] text-[#76777d] block">por dosis</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[11px] text-[#76777d] block font-medium">Pureza Medida</span>
+                <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                  {product.purityPct}%
+                </span>
+                <span className="text-[10px] text-[#76777d] block">HPLC Verificado</span>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[11px] text-[#76777d] block font-medium">Grado Clínico</span>
+                <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                  {product.scoreGrade || 'Grado A'}
+                </span>
+                <span className="text-[10px] text-[#76777d] block">NutriScore {product.nutriScore}</span>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2 pt-2 border-t border-[#f0f3f5]">
             <span className="text-xs font-bold text-[#191c1e] block">Sellos y Patentes Registradas:</span>

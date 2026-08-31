@@ -23,6 +23,7 @@ interface HeaderProps {
   onToggleCompare: (productId: string) => void;
   searchQuery: string;
   onSearchChange: (query: string) => void;
+  onOpenSearchModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,6 +35,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleCompare,
   searchQuery,
   onSearchChange,
+  onOpenSearchModal,
 }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -121,26 +123,28 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Search Bar & Actions */}
           <div className="flex items-center gap-3 flex-1 max-w-md justify-end">
-            <div className="relative w-full max-w-xs">
+            <div 
+              className="relative w-full max-w-xs cursor-pointer"
+              onClick={() => onOpenSearchModal && onOpenSearchModal()}
+            >
               <div className="relative flex items-center">
                 <Search className="w-4 h-4 absolute left-3 text-[#76777d] pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Buscar marcas, ingredientes..."
                   value={searchQuery}
+                  readOnly={Boolean(onOpenSearchModal)}
                   onChange={(e) => onSearchChange(e.target.value)}
-                  onFocus={() => setIsSearchFocused(true)}
+                  onFocus={() => {
+                    if (onOpenSearchModal) onOpenSearchModal();
+                    else setIsSearchFocused(true);
+                  }}
                   onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
-                  className="w-full bg-[#f2f4f6] text-sm text-[#191c1e] placeholder-[#76777d] pl-9 pr-8 py-1.5 rounded-lg border border-transparent focus:border-[#006c49] focus:bg-white focus:outline-none transition-all"
+                  className="w-full bg-[#f2f4f6] text-sm text-[#191c1e] placeholder-[#76777d] pl-9 pr-14 py-1.5 rounded-lg border border-transparent focus:border-[#006c49] focus:bg-white focus:outline-none transition-all cursor-pointer"
                 />
-                {searchQuery && (
-                  <button 
-                    onClick={() => onSearchChange('')}
-                    className="absolute right-2.5 text-[#76777d] hover:text-[#191c1e]"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                )}
+                <kbd className="hidden sm:inline-block absolute right-2.5 px-1.5 py-0.5 text-[10px] font-semibold text-[#76777d] bg-white border border-[#e0e3e5] rounded shadow-2xs">
+                  Ctrl K
+                </kbd>
               </div>
 
               {/* Instant Search Dropdown */}
