@@ -14,10 +14,37 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import readline from 'node:readline';
-import zlib from 'nodestandard:zlib' in globalThis ? undefined : require('node:zlib');
+import zlib from 'node:zlib';
 import { PrismaClient } from '@prisma/client';
+import { calculateClinicalScore } from '../lib/nutriscore-engine';
 
 const prisma = new PrismaClient();
+
+const FITNESS_PATTERNS: RegExp[] = [
+  /supplement/i,
+  /suplemento/i,
+  /suppl[eé]ment/i,
+  /nahrungserg[aä]nzung/i,
+  /prote[ií]n/i,
+  /whey/i,
+  /suero\s+de/i,
+  /lactos[eé]rum/i,
+  /cr[eé]atin/i,
+  /omega[\s\-_]?3/i,
+  /vitamin/i,
+  /mineral/i,
+  /amino[aá]cid/i,
+  /amino\s+acido/i,
+  /acide\s+amin[eé]/i,
+  /\bbcaa\b/i,
+  /\beaa\b/i,
+  /glutamin/i,
+  /magn[eé]s/i,
+  /zinc|cinc/i,
+  /carnitin/i,
+  /pre[\s\-_]?workout/i,
+  /pre[\s\-_]?entreno/i,
+];
 
 // Categorías y palabras clave de fitness permitidas para filtrado selectivo
 const FITNESS_KEYWORDS = [
@@ -43,7 +70,13 @@ const FITNESS_KEYWORDS = [
 interface OFFNutriments {
   proteins_100g?: number;
   carbohydrates_100g?: number;
+  sugars_100g?: number;
   fat_100g?: number;
+  salt_100g?: number;
+  fiber_100g?: number;
+  magnesium_100g?: number;
+  potassium_100g?: number;
+  zinc_100g?: number;
   'energy-kcal_100g'?: number;
   [key: string]: unknown;
 }
@@ -56,8 +89,16 @@ interface OFFProduct {
   brands?: string;
   categories_tags?: string[];
   categories?: string;
+  labels_tags?: string[];
+  allergens_tags?: string[];
+  additives_tags?: string[];
+  nova_group?: number;
   image_url?: string;
   image_front_url?: string;
+  image_nutrition_url?: string;
+  image_ingredients_url?: string;
+  countries_tags?: string[];
+  origins?: string;
   serving_size?: string;
   ingredients_text?: string;
   ingredients_text_es?: string;
@@ -82,37 +123,24 @@ function isFitnessProduct(product: OFFProduct): boolean {
     product.product_name_en || '',
     product.categories || '',
     (product.categories_tags || []).join(' '),
-  ]
-    .join(' ')
-    .toLowerCase();
+    (product.labels_tags || []).join(' '),
+  ].join(' ');
 
-  return FITNESS_KEYWORDS.some((kw) => combinedText.includes(kw));
+  return FITNESS_PATTERNS.some((pattern) => pattern.test(combinedText));
 }
 
 function detectCategory(name: string, categories: string): string {
   const text = `${name} ${categories}`.toLowerCase();
-  if (text.includes('creatin')) return 'Creatina';
-  if (text.includes('whey') || text.includes('protein') || text.includes('proteina') || text.includes('proteína') || text.includes('casein')) return 'Proteína';
-  if (text.includes('pre-workout') || text.includes('preworkout') || text.includes('pre-entreno')) return 'Pre-Entreno';
-  if (text.includes('magnesio') || text.includes('magnesium')) return 'Magnesio';
-  if (text.includes('vitamin') || text.includes('mineral')) return 'Multivitamínico';
+  if (/cr[eé]atin/i.test(text)) return 'Creatina';
+  if (/whey|prote[ií]n|casein|case[ií]na|suero\s+de/i.test(text)) return 'Proteína';
+  if (/pre[\s\-_]?workout|pre[\s\-_]?entreno/i.test(text)) return 'Pre-Entreno';
+  if (/magn[eé]sio|magn[eé]sium/i.test(text)) return 'Magnesio';
+  if (/omega[\s\-_]?3/i.test(text)) return 'Omega-3';
+  if (/vitamin|mineral/i.test(text)) return 'Multivitamínico';
+  if (/\bbcaa\b|\beaa\b|amino[aá]cido|glutamin/i.test(text)) return 'Aminoácidos';
   return 'Suplementos Deportivos';
 }
 
-function calculateNutriScore(protein: number = 0, calories: number = 0, fat: number = 0): number {
-  // Algoritmo clínico simplificado de pureza para suplementos (0 - 100)
-  let score = 50;
-  if (protein > 75) score += 35;
-  else if (protein > 50) score += 20;
-  else if (protein > 20) score += 10;
-
-  if (fat < 3) score += 10;
-  else if (fat > 10) score -= 15;
-
-  if (calories > 400 && protein < 50) score -= 10; // Penaliza gainers con azúcar
-
-  return Math.min(100, Math.max(10, score));
-}
 
 async function processProductBatch(batch: OFFProduct[]) {
   for (const item of batch) {
@@ -129,6 +157,21 @@ async function processProductBatch(batch: OFFProduct[]) {
     const brandSlug = slugify(brandName);
     const categorySlug = slugify(categoryName);
     const productSlug = `${slugify(name)}-${ean.slice(-4)}`;
+
+    // Extracción de etiquetas dietéticas
+    const labels = (item.labels_tags || []).map((l) => l.toLowerCase());
+    const isVegan = labels.some((l) => l.includes('vegan') || l.includes('vegano'));
+    const isVegetarian = isVegan || labels.some((l) => l.includes('vegetarian') || l.includes('vegetariano'));
+    const isGlutenFree = labels.some((l) => l.includes('gluten-free') || l.includes('sin-gluten'));
+    const isLactoseFree = labels.some((l) => l.includes('lactose-free') || l.includes('sin-lactosa'));
+
+    // Extracción de alérgenos y aditivos
+    const allergensList = (item.allergens_tags || []).map((a) => a.replace(/^[a-z]{2}:/, ''));
+    const additivesTags = (item.additives_tags || []).map((a) => a.replace(/^[a-z]{2}:/, ''));
+    const additivesCount = additivesTags.length;
+
+    // Origen de fabricación
+    const countryTag = item.countries_tags?.[0]?.replace(/^[a-z]{2}:/, '') || item.origins || null;
 
     try {
       // 1. Upsert Marca
@@ -170,13 +213,30 @@ async function processProductBatch(batch: OFFProduct[]) {
         },
       });
 
-      // 4. Upsert Información Nutricional
+      // 4. Upsert Información Nutricional Enriquecida
       const protein = item.nutriments?.proteins_100g ?? 0;
       const carbs = item.nutriments?.carbohydrates_100g ?? 0;
+      const sugars = item.nutriments?.sugars_100g ?? 0;
       const fat = item.nutriments?.fat_100g ?? 0;
+      const salt = item.nutriments?.salt_100g ?? 0;
+      const fiber = item.nutriments?.fiber_100g ?? 0;
+      const magnesium = item.nutriments?.magnesium_100g ? item.nutriments.magnesium_100g * 1000 : null; // mg
+      const potassium = item.nutriments?.potassium_100g ? item.nutriments.potassium_100g * 1000 : null; // mg
+      const zinc = item.nutriments?.zinc_100g ? item.nutriments.zinc_100g * 1000 : null; // mg
       const calories = item.nutriments?.['energy-kcal_100g'] ?? 0;
+      const nova = item.nova_group || (additivesCount > 3 ? 4 : additivesCount === 0 ? 1 : 2);
       const ingredients = item.ingredients_text_es || item.ingredients_text || null;
-      const calculatedScore = calculateNutriScore(protein, calories, fat);
+      const { score: calculatedScore } = calculateClinicalScore({
+        category: categoryName,
+        protein,
+        calories,
+        fat,
+        sugars,
+        novaGroup: nova,
+        additivesCount,
+        magnesiumMg: magnesium ?? undefined,
+        ingredientsList: ingredients,
+      });
 
       await prisma.nutritionalInfo.upsert({
         where: { productId: product.id },
@@ -184,8 +244,25 @@ async function processProductBatch(batch: OFFProduct[]) {
           servingSize: item.serving_size || null,
           proteinPer100g: protein,
           carbsPer100g: carbs,
+          sugarsPer100g: sugars,
           fatPer100g: fat,
+          saltPer100g: salt,
+          fiberPer100g: fiber,
+          magnesiumMg: magnesium,
+          potassiumMg: potassium,
+          zincMg: zinc,
           caloriesPer100g: calories,
+          novaGroup: nova,
+          additivesCount,
+          additivesTags,
+          isVegan,
+          isVegetarian,
+          isGlutenFree,
+          isLactoseFree,
+          allergensList,
+          nutritionImageUrl: item.image_nutrition_url || null,
+          ingredientsImageUrl: item.image_ingredients_url || null,
+          manufacturingCountry: countryTag,
           ingredientsList: ingredients,
           nutriscoreCalculated: calculatedScore,
         },
@@ -194,8 +271,25 @@ async function processProductBatch(batch: OFFProduct[]) {
           servingSize: item.serving_size || null,
           proteinPer100g: protein,
           carbsPer100g: carbs,
+          sugarsPer100g: sugars,
           fatPer100g: fat,
+          saltPer100g: salt,
+          fiberPer100g: fiber,
+          magnesiumMg: magnesium,
+          potassiumMg: potassium,
+          zincMg: zinc,
           caloriesPer100g: calories,
+          novaGroup: nova,
+          additivesCount,
+          additivesTags,
+          isVegan,
+          isVegetarian,
+          isGlutenFree,
+          isLactoseFree,
+          allergensList,
+          nutritionImageUrl: item.image_nutrition_url || null,
+          ingredientsImageUrl: item.image_ingredients_url || null,
+          manufacturingCountry: countryTag,
           ingredientsList: ingredients,
           nutriscoreCalculated: calculatedScore,
         },
@@ -207,7 +301,18 @@ async function processProductBatch(batch: OFFProduct[]) {
 }
 
 async function main() {
-  const filePath = process.argv[2] || path.join(process.cwd(), 'data', 'openfoodfacts-products.jsonl');
+  const args = process.argv.slice(2);
+  let filePath = path.join(process.cwd(), 'data', 'openfoodfacts-products.jsonl');
+  let startLine = 0;
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] === '--start-line' || args[i] === '-s') {
+      startLine = parseInt(args[i + 1], 10) || 0;
+      i++;
+    } else if (!args[i].startsWith('-')) {
+      filePath = args[i];
+    }
+  }
 
   if (!fs.existsSync(filePath)) {
     console.error(`❌ Archivo no encontrado en: ${filePath}`);
@@ -218,6 +323,9 @@ async function main() {
   }
 
   console.log(`🚀 Iniciando ingesta en streaming desde: ${filePath}`);
+  if (startLine > 0) {
+    console.log(`⏩ Reanudando a partir de la línea: ${startLine.toLocaleString('es-ES')}`);
+  }
 
   const isGz = filePath.endsWith('.gz');
   const fileStream = fs.createReadStream(filePath);
@@ -235,6 +343,13 @@ async function main() {
 
   for await (const line of rl) {
     totalRead++;
+    if (totalRead < startLine) {
+      if (totalRead % 100000 === 0) {
+        console.log(`⏩ Saltando líneas previas: ${totalRead.toLocaleString('es-ES')} / ${startLine.toLocaleString('es-ES')}...`);
+      }
+      continue;
+    }
+
     if (!line.trim()) continue;
 
     try {
@@ -245,7 +360,7 @@ async function main() {
         if (batch.length >= BATCH_SIZE) {
           await processProductBatch(batch);
           totalImported += batch.length;
-          console.log(`📦 Procesados: ${totalImported} productos fitness (Líneas leídas: ${totalRead})`);
+          console.log(`📦 Procesados: ${totalImported} suplementos nuevos (Línea actual: ${totalRead.toLocaleString('es-ES')})`);
           batch = [];
         }
       }

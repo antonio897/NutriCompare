@@ -92,6 +92,24 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                       src={prod.image} 
                       alt={prod.name} 
                       className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        const cat = prod.category?.toLowerCase() ?? '';
+                        if (cat.includes('creatin')) {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1593095948071-474c5cc2989d?w=600&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('prote')) {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1579722821273-0f6c7d44362f?w=600&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('magnes')) {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?w=600&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('omega')) {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1584362917165-526a968579e8?w=600&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('pre-') || cat.includes('preworkout')) {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?w=600&auto=format&fit=crop&q=80';
+                        } else if (cat.includes('vitamin') || cat.includes('mineral')) {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1550572017-edd951aa8f72?w=600&auto=format&fit=crop&q=80';
+                        } else {
+                          (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1584017911766-d451b3d0e843?w=600&auto=format&fit=crop&q=80';
+                        }
+                      }}
                     />
                     
                     {/* NutriScore Badge pill in top corner */}
@@ -137,14 +155,23 @@ export const DirectoryView: React.FC<DirectoryViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Certifications badges */}
+                  {/* Certifications, NOVA & Dietary badges */}
                   <div className="flex flex-wrap gap-1 mt-3">
-                    {prod.certifications.slice(0, 2).map((cert) => (
+                    {prod.novaGroup && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                        prod.novaGroup === 1 ? 'bg-emerald-100 text-emerald-800' :
+                        prod.novaGroup === 2 ? 'bg-blue-100 text-blue-800' :
+                        prod.novaGroup === 3 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        NOVA {prod.novaGroup}
+                      </span>
+                    )}
+                    {prod.certifications.slice(0, 1).map((cert) => (
                       <span key={cert} className="text-[10px] font-semibold bg-[#dae2fd] text-[#131b2e] px-2 py-0.5 rounded">
                         {cert}
                       </span>
                     ))}
-                    {prod.dietaryTags.slice(0, 1).map((tag) => (
+                    {prod.dietaryTags.slice(0, 2).map((tag) => (
                       <span key={tag} className="text-[10px] font-medium bg-[#f2f4f6] text-[#45464d] px-2 py-0.5 rounded">
                         {tag}
                       </span>

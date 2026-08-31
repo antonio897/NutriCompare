@@ -1,4 +1,4 @@
-export type CategoryType = 'Creatina' | 'Proteína' | 'Pre-Entreno' | 'Multivitamínico' | 'Magnesio' | 'Omega-3';
+export type CategoryType = 'Creatina' | 'Proteína' | 'Pre-Entreno' | 'Multivitamínico' | 'Magnesio' | 'Omega-3' | 'Aminoácidos' | 'Suplementos Deportivos' | (string & {});
 
 export interface SupplementProduct {
   id: string;
@@ -19,7 +19,7 @@ export interface SupplementProduct {
   format: string; // e.g. "Polvo sin sabor", "Cápsulas"
   allergens: string; // e.g. "Libre de gluten, soja y lácteos"
   certifications: string[]; // e.g. ["Creapure®", "Informed Sport", "Third-Party Tested"]
-  transparencyLevel: 1 | 2 | 3; // 1: Blends, 2: Partial, 3: Full Disclosure
+  transparencyLevel: 1 | 2 | 3 | number; // 1: Blends, 2: Partial, 3: Full Disclosure
   isPurityCertified: boolean;
   dietaryTags: string[]; // ["Sin Gluten", "Vegano", "Sin Lactosa", "Cero Azúcar"]
   description: string;
@@ -34,7 +34,58 @@ export interface SupplementProduct {
     leucinePerDose?: string;
     creapureOfficial?: boolean;
     heavyMetalsTested?: boolean;
+    aminogram?: {
+      leucine?: number;
+      isoleucine?: number;
+      valine?: number;
+      totalBcaa?: number;
+      glutamine?: number;
+    };
+    rawPurityPct?: number;
+    heavyMetalsStatus?: 'PASSED' | 'WARNING' | 'FAILED';
+    latestLabReport?: {
+      labName: string;
+      measuredPurity: number;
+      leadPpm?: number;
+      isCompliant: boolean;
+      verdictNotes?: string;
+    };
+    nutritionImageUrl?: string | null;
+    manufacturingCountry?: string | null;
+    novaGroup?: number;
+    sugarsPer100g?: number;
+    qualitySeals?: Array<{
+      name: string;
+      issuer?: string;
+      badgeUrl?: string;
+      websiteUrl?: string;
+    }>;
+    priceHistory?: Array<{
+      date: string;
+      price: number;
+      vendor: string;
+    }>;
   };
+  novaGroup?: number;
+  sugarsPer100g?: number;
+  saltPer100g?: number;
+  additivesCount?: number;
+  additivesTags?: string[];
+  nutritionImageUrl?: string | null;
+  ingredientsImageUrl?: string | null;
+  frontImageUrl?: string | null;
+  frontSmallImageUrl?: string | null;
+  packagingImageUrl?: string | null;
+  packageQuantity?: string | null;
+  sourceUrl?: string | null;
+  caffeineMg?: number | null;
+  saturatedFatPer100g?: number | null;
+  calciumMg?: number | null;
+  ironMg?: number | null;
+  vitaminsList?: Record<string, number> | null;
+  ecoscoreGrade?: string | null;
+  manufacturingCountry?: string | null;
+  ingredientsList?: string | null;
   radarScores: {
     pureza: number; // 0-10
     valor: number; // 0-10
@@ -80,6 +131,7 @@ export interface ActiveFilters {
   category?: CategoryType | 'All';
   purityCertifiedOnly: boolean;
   dietaryNeed?: string;
+  novaGroup?: number;
   minScore: number;
   searchQuery: string;
   sortBy: 'popular' | 'score' | 'priceAsc' | 'purity';

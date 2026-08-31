@@ -32,22 +32,29 @@ model Category {
 }
 
 model Product {
-  id          String           @id @default(cuid())
-  ean         String           @unique // Código de barras EAN/UPC clave para cruzar datos sin ambigüedad
-  name        String
-  slug        String           @unique
-  brandId     String?          @map("brand_id")
-  categoryId  String?          @map("category_id")
-  imageUrl    String?          @map("image_url")
-  isActive    Boolean          @default(true) @map("is_active")
-  createdAt   DateTime         @default(now()) @map("created_at")
-  updatedAt   DateTime         @updatedAt @map("updated_at")
+  id                 String           @id @default(cuid())
+  ean                String           @unique // Código de barras EAN/UPC clave para cruzar datos sin ambigüedad
+  name               String
+  slug               String           @unique
+  brandId            String?          @map("brand_id")
+  categoryId         String?          @map("category_id")
+  imageUrl           String?          @map("image_url") // Imagen principal (fallback)
+  frontImageUrl      String?          @map("front_image_url") // URL completa 400px oficial con rev de la portada
+  frontSmallImageUrl String?          @map("front_small_image_url") // URL 200px oficial con rev
+  packagingImageUrl  String?          @map("packaging_image_url") // URL de la foto del envase
+  packageQuantity    String?          @map("package_quantity") // Ej: "500 g", "1 kg", "120 cápsulas"
+  sourceUrl          String?          @map("source_url") // URL origen (ficha Open Food Facts / fabricante)
+  isActive           Boolean          @default(true) @map("is_active")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
 
   // Relaciones
   brand           Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
   category        Category?        @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   nutritionalInfo NutritionalInfo?
   vendorOffers    VendorOffer[]
+  certifications  ProductCertification[]
+  labReports      LabReport[]
 
   // Índices para búsquedas y filtros ultrarrápidos con bajo consumo de memoria
   @@index([ean])
@@ -63,17 +70,106 @@ model NutritionalInfo {
   proteinPer100g       Float?   @map("protein_per_100g")
   creatinePerServing   Float?   @map("creatine_per_serving") // Gramos de creatina por dosis
   carbsPer100g         Float?   @map("carbs_per_100g")
+  sugarsPer100g        Float?   @map("sugars_per_100g")
   fatPer100g           Float?   @map("fat_per_100g")
+  saturatedFatPer100g  Float?   @map("saturated_fat_per_100g") // Grasas saturadas
   caloriesPer100g      Float?   @map("calories_per_100g")
+  saltPer100g          Float?   @map("salt_per_100g")
+  fiberPer100g         Float?   @map("fiber_per_100g")
+  caffeineMg           Float?   @map("caffeine_mg") // Cafeína en mg (clave para Pre-Entrenos)
+  magnesiumMg          Float?   @map("magnesium_mg")
+  potassiumMg          Float?   @map("potassium_mg")
+  zincMg               Float?   @map("zinc_mg")
+  calciumMg            Float?   @map("calcium_mg")
+  ironMg               Float?   @map("iron_mg")
+  vitaminsList         Json?    @map("vitamins_list") // Objeto JSON con vitaminas (C, D, B12, etc.)
+  novaGroup            Int?     @map("nova_group") // 1: No procesado / puro, 4: Ultraprocesado
+  ecoscoreGrade        String?  @map("ecoscore_grade") // "a", "b", "c", "d", "e"
+  additivesCount       Int?     @default(0) @map("additives_count")
+  additivesTags        String[] @default([]) @map("additives_tags") // ["e955-sucralosa", "e950-acesulfamo-k"]
+  isVegan              Boolean? @default(false) @map("is_vegan")
+  isVegetarian         Boolean? @default(false) @map("is_vegetarian")
+  isGlutenFree         Boolean? @default(false) @map("is_gluten_free")
+  isLactoseFree        Boolean? @default(false) @map("is_lactose_free")
+  allergensList        String[] @default([]) @map("allergens_list")
+  nutritionImageUrl    String?  @map("nutrition_image_url") // URL CDN oficial de la tabla nutricional
+  ingredientsImageUrl  String?  @map("ingredients_image_url")
+  manufacturingCountry String?  @map("manufacturing_country")
   ingredientsList      String?  @map("ingredients_list") @db.Text
   nutriscoreCalculated Float?   @map("nutriscore_calculated") // Puntuación calculada de 0 a 100
   purityCertified      Boolean  @default(false) @map("purity_certified")
+
+  // Aminograma detallado (Fase 3: gramos por 100g de proteína)
+  leucinePer100g       Float?   @map("leucine_per_100g") // Leucina (trigger de síntesis proteica mTOR)
+  isoleucinePer100g    Float?   @map("isoleucine_per_100g") // Isoleucina
+  valinePer100g        Float?   @map("valine_per_100g") // Valina
+  totalBcaaPer100g     Float?   @map("total_bcaa_per_100g") // Total BCAAs
+  glutaminePer100g     Float?   @map("glutamine_per_100g") // Glutamina
+
+  // Pureza y perfil analítico
+  rawPurityPercentage  Float?   @map("raw_purity_percentage") // Ej: 99.9% en Creapure o 90% en Isolate
+  heavyMetalsStatus    String?  @default("PASSED") @map("heavy_metals_status") // "PASSED", "WARNING", "FAILED"
+  additivesScore       Int?     @default(100) @map("additives_score") // 100 = sin aditivos artificiales
+
   createdAt            DateTime @default(now()) @map("created_at")
   updatedAt            DateTime @updatedAt @map("updated_at")
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@map("nutritional_info")
+}
+
+// Catálogo de Sellos Oficiales de Calidad y Patentes Registradas
+model CertificationSeal {
+  id          String   @id @default(cuid())
+  name        String   @unique // Ej: "Creapure®", "Informed-Sport", "Kyowa Quality®", "Cologne List", "DigeZyme®"
+  slug        String   @unique
+  issuer      String?  // Ej: "AlzChem Trostberg GmbH", "LGC Group", "Kyowa Hakko"
+  description String?  @db.Text
+  badgeUrl    String?  @map("badge_url")
+  websiteUrl  String?  @map("website_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  products ProductCertification[]
+
+  @@map("certification_seals")
+}
+
+// Relación N:M entre Productos y Sellos de Certificación
+model ProductCertification {
+  id                  String            @id @default(cuid())
+  productId           String            @map("product_id")
+  certificationSealId String            @map("certification_seal_id")
+  certificateNumber   String?           @map("certificate_number") // Número de lote o licencia oficial
+  verifiedAt          DateTime?         @map("verified_at")
+
+  product             Product           @relation(fields: [productId], references: [id], onDelete: Cascade)
+  certification       CertificationSeal @relation(fields: [certificationSealId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, certificationSealId])
+  @@map("product_certifications")
+}
+
+// Informes de Análisis de Laboratorio Externos (Transparencia e Independencia)
+model LabReport {
+  id               String    @id @default(cuid())
+  productId        String    @map("product_id")
+  labName          String    @map("lab_name") // Ej: "Labdoor", "Eurofins", "SGS", "Laboratorio NutriCompare"
+  reportUrl        String?   @map("report_url")
+  analysisDate     DateTime  @map("analysis_date")
+  measuredPurity   Float     @map("measured_purity") // Pureza real medida en cromatografía HPLC (%)
+  leadPpm          Float?    @map("lead_ppm")        // Plomo en partes por millón
+  cadmiumPpm       Float?    @map("cadmium_ppm")     // Cadmio en ppm
+  arsenicPpm       Float?    @map("arsenic_ppm")     // Arsénico en ppm
+  mercuryPpm       Float?    @map("mercury_ppm")     // Mercurio en ppm
+  isCompliant      Boolean   @default(true) @map("is_compliant")
+  verdictNotes     String?   @map("verdict_notes") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at")
+
+  product          Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, analysisDate])
+  @@map("lab_reports")
 }
 
 model VendorOffer {

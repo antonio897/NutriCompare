@@ -29,7 +29,7 @@ export const RankingsView: React.FC<RankingsViewProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('Proteína');
 
-  const categories: CategoryType[] = ['Proteína', 'Creatina', 'Pre-Entreno', 'Multivitamínico', 'Magnesio'];
+  const categories: CategoryType[] = ['Proteína', 'Creatina', 'Pre-Entreno', 'Multivitamínico', 'Magnesio', 'Omega-3', 'Aminoácidos'];
 
   // Filter and sort by NutriScore descending
   const categoryProducts = products

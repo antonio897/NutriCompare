@@ -1,4 +1,5 @@
 import { SupplementProduct } from '../types';
+import { getAmazonAffiliateUrl, getHsnAffiliateUrl, getProzisAffiliateUrl } from '../utils/affiliateLinks';
 
 export const SUPPLEMENT_PRODUCTS: SupplementProduct[] = [
   {
@@ -715,6 +716,7 @@ export const SUPPLEMENT_PRODUCTS: SupplementProduct[] = [
     ],
     purchaseLinks: [
       { store: 'iHerb', url: 'https://iherb.com', price: 22.50, highlight: true },
+      { store: 'Amazon', url: getAmazonAffiliateUrl('Life Extension Two-Per-Day Multivitamin'), price: 23.90 },
       { store: 'Life Extension Web', url: 'https://lifeextension.com', price: 24.00 },
     ],
     algorithmSummary: {
@@ -723,4 +725,44 @@ export const SUPPLEMENT_PRODUCTS: SupplementProduct[] = [
     },
     rank: 1,
   },
-];
+].map((product) => {
+  // Enriquecer automáticamente todos los enlaces de compra con tags de afiliado reales
+  const fullName = `${product.brand} ${product.name}`;
+  const updatedLinks = product.purchaseLinks.map((link) => {
+    if (link.store.toLowerCase().includes('amazon')) {
+      return {
+        ...link,
+        url: getAmazonAffiliateUrl(fullName),
+      };
+    }
+    if (link.store.toLowerCase().includes('hsn')) {
+      return {
+        ...link,
+        url: getHsnAffiliateUrl(fullName),
+      };
+    }
+    if (link.store.toLowerCase().includes('prozis')) {
+      return {
+        ...link,
+        url: getProzisAffiliateUrl(fullName),
+      };
+    }
+    return link;
+  });
+
+  // Asegurar que siempre exista la opción de Amazon si no estaba presente
+  if (!updatedLinks.some((l) => l.store.toLowerCase().includes('amazon'))) {
+    updatedLinks.unshift({
+      store: 'Amazon',
+      url: getAmazonAffiliateUrl(fullName),
+      price: product.price,
+      highlight: true,
+    });
+  }
+
+  return {
+    ...product,
+    purchaseLinks: updatedLinks,
+  };
+});
+

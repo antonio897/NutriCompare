@@ -159,6 +159,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </span>
             )}
 
+            {filters.novaGroup && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-emerald-100 text-emerald-800">
+                NOVA {filters.novaGroup}
+                <button 
+                  onClick={() => onFilterChange({ novaGroup: undefined })}
+                  className="hover:text-red-600 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
             {filters.searchQuery && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#f2f4f6] text-[#45464d]">
                 "{filters.searchQuery}"
@@ -224,6 +236,46 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
               >
                 {diet}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Grado de Procesamiento NOVA */}
+      <div className="bg-white rounded-2xl p-4 border border-[#e0e3e5] shadow-sm space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-[11px] font-bold uppercase tracking-wider text-[#76777d] font-label-caps">
+            Grado NOVA (Procesamiento)
+          </p>
+          {filters.novaGroup && (
+            <button
+              onClick={() => onFilterChange({ novaGroup: undefined })}
+              className="text-[10px] text-[#006c49] font-medium hover:underline"
+            >
+              Borrar
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          {[
+            { group: 1, label: 'NOVA 1: Puro', color: 'border-emerald-500 text-emerald-700 bg-emerald-50' },
+            { group: 2, label: 'NOVA 2: Simple', color: 'border-blue-500 text-blue-700 bg-blue-50' },
+            { group: 3, label: 'NOVA 3: Procesado', color: 'border-amber-500 text-amber-700 bg-amber-50' },
+            { group: 4, label: 'NOVA 4: Ultra', color: 'border-red-500 text-red-700 bg-red-50' },
+          ].map((item) => {
+            const isSelected = filters.novaGroup === item.group;
+            return (
+              <button
+                key={item.group}
+                onClick={() => onFilterChange({ novaGroup: isSelected ? undefined : item.group })}
+                className={`px-2 py-1.5 rounded-lg text-xs font-medium border text-center transition-all ${
+                  isSelected
+                    ? 'bg-[#131b2e] text-white border-[#131b2e] shadow-xs'
+                    : `${item.color} hover:opacity-80`
+                }`}
+              >
+                {item.label}
               </button>
             );
           })}

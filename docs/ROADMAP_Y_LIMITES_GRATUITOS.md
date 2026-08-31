@@ -79,12 +79,76 @@ npx tsx scripts/seed-openfoodfacts.ts data/openfoodfacts-products.jsonl.gz
 
 ---
 
-### 🔹 Fase 3: Enriquecimiento Nutricional & Sellos de Pureza (Siguiente Fase ⏳)
-- [ ] Ampliar el esquema Prisma para soportar tabla de sellos y patentes oficiales (`Creapure®`, `Informed-Sport`, `Kyowa Quality®`, `Cologne List`, `DigeZyme®`).
-- [ ] Relacionar los productos ingestados con sus análisis de metales pesados y certificaciones de laboratorio.
-- [ ] Refinar el algoritmo de cálculo automático de `nutriscore_calculated` basado en el aminograma completo (leucina, isoleucina, valina).
+### 🔹 Fase 3: Enriquecimiento Nutricional & Sellos de Pureza (Completada ✅)
+- [x] **Esquema Prisma Ampliado** (`prisma/schema.prisma`): Nuevas entidades `CertificationSeal`, `ProductCertification` (N:M) y `LabReport` con control de pureza HPLC y metales pesados (Pb, Cd, As, Hg).
+- [x] **Motor Clínico de NutriScore** (`lib/nutriscore-engine.ts`): Algoritmo de 0 a 100 con desglose por densidad activa (40 pts), aminograma mTOR (25 pts), patentes registradas (20 pts) y seguridad analítica (15 pts).
+- [x] **Script de Población de Sellos & Análisis** (`scripts/seed-quality-seals-and-labs.ts`): Carga patentes oficiales (`Creapure®`, `Informed-Sport`, `Kyowa Quality®`, `Cologne List`, `DigeZyme®`), genera informes de cromatografía y recalcula scores.
+- [x] **Consulta de Comparación Enriquecida** (`lib/comparison-service.ts`): Cruce simultáneo de ofertas mínimas, sellos certificados, aminograma y últimos informes de laboratorio en 1 sola consulta SQL.
 
-### 🔹 Fase 4: Optimización y Conexión Frontend (Next.js & Edge Cache ⏳)
-- [ ] Conectar la función `getComparisonData()` de `lib/comparison-service.ts` con la interfaz del Comparador (`ComparisonView.tsx`).
-- [ ] Implementar Server Actions / React Server Components con `unstable_cache` o `revalidateTag` para cachear comparativas frecuentes con coste 0.
-- [ ] Pintar gráficas interactivas de evolución histórica de precios en la ficha de producto (`ProductDetailView.tsx`) usando los registros de `PriceHistory`.
+---
+
+### 🔹 Fase 4: Optimización y Conexión Frontend (Completada ✅)
+- [x] **Gráfico de Evolución de Precios Interactivo** (`src/components/PriceHistoryChart.tsx`): Gráfico SVG responsivo con selección temporal (30d, 90d, histórico), cálculo de mínimos históricos y tooltips flotantes por proveedor.
+- [x] **Ficha de Producto Enriquecida** (`src/components/ProductDetailView.tsx`): Integración del gráfico de precios, desglose de aminograma mTOR (Leucina, BCAAs), sellos de patentes y certificado de laboratorio con metales pesados.
+- [x] **Comparador Lado a Lado Actualizado** (`src/components/ComparisonView.tsx`): Nuevas filas comparativas para aminograma, límites de contaminantes y mejor precio en tiempo real.
+- [x] **Endpoint Serverless con Edge Cache** (`api/products/compare.ts`): Consulta de comparativa de hasta 4 productos con cabecera `Cache-Control: s-maxage=3600, stale-while-revalidate=86400` para reducir consultas a base de datos a 0€.
+- [x] **Tipos TypeScript Estrictos** (`src/types.ts`): Soporte completo para aminogramas, patentes, informes de laboratorio e histórico de precios.
+
+---
+
+## 🔮 4. Backlog y Próximas Fases (Priorizadas por Impacto y Almacenamiento)
+
+### ❓ ¿Soporta imágenes Neon y cómo afecta al almacenamiento?
+> [!IMPORTANT]
+> **Estrategia de Imágenes a Coste 0€:**
+> En PostgreSQL **NUNCA se guardan los archivos binarios de las imágenes** (hacerlo saturaría los 512 MB de Neon en segundos).
+> En su lugar, **solo guardamos las URLs de texto** (ej: `https://images.openfoodfacts.org/.../front.jpg`), que están alojadas gratuitamente en los servidores CDN de Open Food Facts.
+> Guardar la URL ocupa apenas **~80 bytes de texto** por producto, por lo que almacenar 15.000 URLs consume menos de **1.2 MB** en Neon (despreciable para el límite gratuito de 512 MB).
+
+---
+
+### 🔹 Fase 5: Enriquecimiento Avanzado de Datos Open Food Facts (Completada ✅)
+
+| Prioridad | Tarea / Característica | Estado | Archivos Relacionados |
+| :---: | :--- | :---: | :--- |
+| 🔴 **ALTA** | **Filtros de Alérgenos & Dietas** (`isVegan`, `isGlutenFree`, `isLactoseFree`, `allergensList`) | ✅ Hecho | `prisma/schema.prisma`, `Sidebar.tsx`, `api/products/list.ts` |
+| 🔴 **ALTA** | **Desglose de Azúcares Añadidos y Sal** (`sugarsPer100g`, `saltPer100g`) | ✅ Hecho | `ProductDetailView.tsx`, `seed-openfoodfacts.ts` |
+| 🟡 **MEDIA** | **Minerales & Electrolitos Activos** (`magnesiumMg`, `potassiumMg`, `zincMg`) | ✅ Hecho | `prisma/schema.prisma`, `seed-openfoodfacts.ts` |
+| 🟡 **MEDIA** | **Detección de Edulcorantes y Aditivos** (`additivesCount`, `additivesTags`) | ✅ Hecho | `ProductDetailView.tsx`, `seed-openfoodfacts.ts` |
+| 🟡 **MEDIA** | **Grado de Procesamiento NOVA** (`novaGroup` 1-4) | ✅ Hecho | `Sidebar.tsx`, `DirectoryView.tsx`, `ProductDetailView.tsx` |
+| 🟢 **BAJA** | **Visualizador de Foto Real de Etiqueta** (`nutritionImageUrl`, `ingredientsImageUrl`) | ✅ Hecho | `ProductDetailView.tsx` (Modal interactivo con zoom) |
+| 🟢 **BAJA** | **País de Fabricación / Origen** (`manufacturingCountry`) | ✅ Hecho | `ProductDetailView.tsx`, `api/products/list.ts` |
+
+---
+
+### 🔹 Fase 6: Pipeline de Sincronización Incremental (Completada ✅)
+
+> [!TIP]
+> **Estrategia para no volver a descargar los 11 GB masivos:**
+> Los volcados completos solo se descargan una vez cada 3 o 6 meses. Para las actualizaciones del día a día, se utiliza la **API Delta de Open Food Facts**, que solo descarga los cambios de las últimas 24 horas (~1 MB).
+
+- [x] **Script de Actualización Incremental Ligera** (`scripts/sync-openfoodfacts-delta.ts`):
+  - Consulta el endpoint delta: `https://world.openfoodfacts.org/cgi/search.pl?action=process&last_modified_time_from={TIMESTAMP}&json=true`.
+  - Filtra solo las categorías fitness añadidas o modificadas en las últimas horas/días.
+  - Aplica `upsert` en PostgreSQL actualizando únicamente los campos cambiados sin duplicar registros.
+- [x] **Mantenimiento de Catálogo Activo / Inactivo:**
+  - Preserva el histórico de precios y el SEO de la web gestionando el estado en PostgreSQL.
+- [x] **Configuración de Flags `--days` y Automatización:**
+  - Listo para ejecución manual (`npx tsx scripts/sync-openfoodfacts-delta.ts --days 7`) o integración en GitHub Actions mensual a coste 0€.
+
+---
+
+### 🔹 Fase 7: Centralización del Motor de Scoring (Completada ✅)
+
+> [!NOTE]
+> **Objetivo:** Unificar en una única función/módulo (`lib/nutriscore-engine.ts`) todas las reglas de negocio de suma y resta de puntos (pureza de proteína, penalizaciones por exceso de azúcar, grado NOVA, aditivos y sellos de patentes) para que todos los scripts de ingesta (`seed-openfoodfacts-v2.ts`, `sync-openfoodfacts-delta.ts`, etc.) y la API compartan la misma lógica sin duplicar código.
+
+- [x] **Unificación del Motor de NutriScore en `lib/nutriscore-engine.ts`:**
+  - Exportar una función unificada `calculateClinicalScore(params: ClinicalScoreInput)` con todas las reglas clínicas ponderadas adaptativas por categoría (Creatina, Proteína, Pre-Entreno, Magnesio, Omega-3, Aminoácidos, Multivitamínicos).
+  - Reemplazadas todas las funciones locales `calculateNutriScore` duplicadas en `seed-openfoodfacts-v2.ts`, `seed-openfoodfacts.ts` y `sync-openfoodfacts-delta.ts` para que importen directamente el motor central.
+  - Implementada la visualización completa en la web (`ProductDetailView.tsx`): panel de micronutrientes/vitaminas (`vitaminsList`), medidor de cafeína y rendimiento, insignia de EcoScore y formato de envase.
+  - Suite de tests unitarios en `scripts/test-nutriscore-engine.ts` para validar consistencia entre categorías.
+
+
+
+

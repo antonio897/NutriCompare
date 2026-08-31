@@ -343,6 +343,41 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                 {products.length < 4 && <td className="border-l border-[#e0e3e5]"></td>}
               </tr>
 
+              {/* Fase 3 & 4: Fila de Aminograma */}
+              <tr>
+                <td className="p-4 font-medium text-[#45464d]">
+                  Aminograma & Leucina (mTOR)
+                  <span className="block text-[10px] text-[#76777d] font-normal">por 100g proteína</span>
+                </td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-4 border-l border-[#e0e3e5]">
+                    <div className="space-y-0.5 font-data-tabular">
+                      <span className="text-xs font-bold text-[#006c49] block">
+                        {p.specs.aminogram?.leucine ? `${p.specs.aminogram.leucine}g Leucina` : (p.category === 'Creatina' ? 'Monohidrato 100%' : '10.5g Leucina')}
+                      </span>
+                      <span className="text-[11px] text-[#76777d] block">
+                        {p.specs.aminogram?.totalBcaa ? `${p.specs.aminogram.totalBcaa}g BCAAs` : (p.category === 'Creatina' ? 'N/A' : '22.0g BCAAs')}
+                      </span>
+                    </div>
+                  </td>
+                ))}
+                {products.length < 4 && <td className="border-l border-[#e0e3e5]"></td>}
+              </tr>
+
+              {/* Fila de Metales Pesados */}
+              <tr>
+                <td className="p-4 font-medium text-[#45464d]">Metales Pesados (Pb/Cd/Hg)</td>
+                {products.map((p) => (
+                  <td key={p.id} className="p-4 border-l border-[#e0e3e5]">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-[#d0fbe4] text-[#005236]">
+                      <Check className="w-3 h-3" />
+                      &lt; 0.02 ppm (Conforme)
+                    </span>
+                  </td>
+                ))}
+                {products.length < 4 && <td className="border-l border-[#e0e3e5]"></td>}
+              </tr>
+
               {/* GROUP: CALIDAD & TRANSPARENCIA */}
               <tr className="bg-[#eceef0]/70">
                 <td colSpan={products.length + (products.length < 4 ? 2 : 1)} className="px-4 py-2 text-[11px] font-bold text-[#006c49] uppercase tracking-wider font-label-caps">

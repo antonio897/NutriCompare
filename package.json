@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
-    "@prisma/client": "^6.4.1",
     "@tailwindcss/vite": "^4.1.14",
     "@vercel/node": "^5.1.8",
     "@vitejs/plugin-react": "^5.0.4",
@@ -26,6 +25,7 @@
     "vite": "^6.2.3"
   },
   "devDependencies": {
+    "@prisma/client": "^6.4.1",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "autoprefixer": "^10.4.21",

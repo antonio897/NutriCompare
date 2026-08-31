@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { SUPPLEMENT_PRODUCTS } from './data/supplements';
+import { useProducts } from './hooks/useProducts';
 import { BLOG_ARTICLES } from './data/blogArticles';
 import { ActiveFilters, CategoryType } from './types';
 import { Header } from './components/Header';
@@ -20,6 +20,7 @@ import { ShareModal } from './components/ShareModal';
 import { Footer } from './components/Footer';
 
 export default function App() {
+  // 🔌 Carga de productos desde Neon PostgreSQL (con fallback automático al mockup)
   // Navigation & View State
   const [currentView, setCurrentView] = useState<string>('directorio');
   const [selectedProductId, setSelectedProductId] = useState<string | null>('creature-creapure');
@@ -44,7 +45,10 @@ export default function App() {
     sortBy: 'popular',
   });
 
-  const categories: CategoryType[] = ['Creatina', 'Proteína', 'Pre-Entreno', 'Multivitamínico', 'Magnesio'];
+  // Carga reactiva: cuando cambian los filtros, la API devuelve los datos actualizados
+  const { products: dbProducts, loading, usingMockData, total: dbTotal, hasMore, loadMore } = useProducts(filters);
+
+  const categories: CategoryType[] = ['Creatina', 'Proteína', 'Pre-Entreno', 'Multivitamínico', 'Magnesio', 'Omega-3', 'Aminoácidos'];
 
   // Toggle supplement in comparison
   const handleToggleCompare = (id: string) => {
@@ -91,26 +95,17 @@ export default function App() {
     });
   };
 
-  // Filtered Products for Directory
-  const filteredProducts = SUPPLEMENT_PRODUCTS.filter((prod) => {
-    if (filters.category !== 'All' && prod.category !== filters.category) return false;
-    if (filters.purityCertifiedOnly && !prod.isPurityCertified) return false;
-    if (filters.dietaryNeed && !prod.dietaryTags.includes(filters.dietaryNeed)) return false;
-    if (filters.minScore > 0 && prod.nutriScore < filters.minScore) return false;
-    if (filters.searchQuery.trim()) {
-      const q = filters.searchQuery.toLowerCase();
-      const match =
-        prod.name.toLowerCase().includes(q) ||
-        prod.brand.toLowerCase().includes(q) ||
-        prod.category.toLowerCase().includes(q) ||
-        prod.certifications.some((c) => c.toLowerCase().includes(q));
-      if (!match) return false;
-    }
-    return true;
+  // Los filtros los gestiona el hook useProducts (API) o el fallback mockup
+  // El filtro de sortBy se aplica en cliente para no añadir latencia extra
+  const filteredProducts = [...dbProducts].sort((a, b) => {
+    if (filters.sortBy === 'price-asc') return a.price - b.price;
+    if (filters.sortBy === 'price-desc') return b.price - a.price;
+    if (filters.sortBy === 'score') return b.nutriScore - a.nutriScore;
+    return b.nutriScore - a.nutriScore; // 'popular' → por score descendente
   });
 
-  const comparedProducts = SUPPLEMENT_PRODUCTS.filter((p) => comparisonIds.includes(p.id));
-  const selectedProduct = SUPPLEMENT_PRODUCTS.find((p) => p.id === selectedProductId) || SUPPLEMENT_PRODUCTS[0];
+  const comparedProducts = dbProducts.filter((p) => comparisonIds.includes(p.id));
+  const selectedProduct = dbProducts.find((p) => p.id === selectedProductId) || dbProducts[0];
 
   return (
     <div className="min-h-screen flex flex-col bg-[#f7f9fb] text-[#191c1e]">
@@ -122,7 +117,7 @@ export default function App() {
           setCurrentView(view);
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        products={SUPPLEMENT_PRODUCTS}
+        products={dbProducts}
         comparisonIds={comparisonIds}
         onSelectProduct={handleSelectProduct}
         onToggleCompare={handleToggleCompare}
@@ -139,10 +134,29 @@ export default function App() {
               onFilterChange={handleFilterChange}
               onResetFilters={handleResetFilters}
               categories={categories}
-              totalProductsCount={SUPPLEMENT_PRODUCTS.length}
+              totalProductsCount={dbTotal || dbProducts.length}
               filteredCount={filteredProducts.length}
             />
             <div className="flex-1">
+              {/* Banner de origen de datos */}
+              {!loading && usingMockData && (
+                <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+                  <span>⚠️</span>
+                  <span><strong>Datos de demostración</strong> — La base de datos aún se está poblando. Los datos reales aparecerán automáticamente en cuanto termine la ingesta.</span>
+                </div>
+              )}
+              {!loading && !usingMockData && dbTotal > 0 && (
+                <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm">
+                  <span>✅</span>
+                  <span><strong>{dbTotal.toLocaleString('es-ES')} suplementos reales</strong> cargados desde tu base de datos PostgreSQL.</span>
+                </div>
+              )}
+              {loading && (
+                <div className="mb-4 flex items-center gap-2 px-3 py-2 rounded-lg bg-blue-50 border border-blue-200 text-blue-800 text-sm">
+                  <span className="animate-spin">⏳</span>
+                  <span>Consultando base de datos...</span>
+                </div>
+              )}
               <DirectoryView
                 products={filteredProducts}
                 onSelectProduct={handleSelectProduct}
@@ -151,6 +165,17 @@ export default function App() {
                 filters={filters}
                 onFilterChange={handleFilterChange}
               />
+              {/* Botón "Ver más" para paginación */}
+              {hasMore && !loading && (
+                <div className="mt-8 flex justify-center">
+                  <button
+                    onClick={loadMore}
+                    className="px-8 py-3 rounded-full bg-[#006c49] text-white font-semibold hover:bg-[#005a3c] transition-colors shadow-md"
+                  >
+                    Cargar más suplementos
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -158,7 +183,7 @@ export default function App() {
         {currentView === 'comparador' && (
           <ComparisonView
             products={comparedProducts}
-            allProducts={SUPPLEMENT_PRODUCTS}
+            allProducts={dbProducts}
             onRemoveFromCompare={handleRemoveFromCompare}
             onAddToCompare={handleAddToCompare}
             onSelectProduct={handleSelectProduct}
@@ -183,7 +208,7 @@ export default function App() {
 
         {currentView === 'rankings' && (
           <RankingsView
-            products={SUPPLEMENT_PRODUCTS}
+            products={dbProducts}
             onSelectProduct={handleSelectProduct}
             onToggleCompare={handleToggleCompare}
             comparisonIds={comparisonIds}
