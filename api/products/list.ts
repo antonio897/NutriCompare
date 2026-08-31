@@ -211,6 +211,8 @@ function mapProductToFrontend(p: {
   const protein = p.nutritionalInfo?.proteinPer100g ?? 0;
   const serving = 5;
   const priceRaw = Number(p.vendorOffers?.[0]?.currentPrice ?? 0);
+  // Término de búsqueda: "Marca Nombre" para Amazon y HSN
+  const searchTerm = [p.brand?.name, p.name].filter(Boolean).join(' ').trim() || p.name || '';
   const certNames = (p.certifications ?? [])
     .map((c: any) => c?.certification?.name || c?.name || '')
     .filter(Boolean);
@@ -276,7 +278,7 @@ function mapProductToFrontend(p: {
     packagingImageUrl: p.packagingImageUrl,
     packageQuantity: p.packageQuantity,
     sourceUrl: p.sourceUrl,
-    price: priceRaw || 19.99,
+    price: priceRaw || 0,
     currency: '€',
     servings: Math.round(500 / serving),
     servingSize: `${serving}g`,
@@ -291,7 +293,9 @@ function mapProductToFrontend(p: {
     transparencyLevel: (certNames.length >= 2 ? 3 : certNames.length === 1 ? 2 : 1) as 1 | 2 | 3,
     isPurityCertified: certNames.length > 0 || purityPct >= 99,
     dietaryTags: dietaryTags.length ? dietaryTags : ['Análisis Nutricional Verificado'],
-    description: `Suplemento de ${p.brand?.name ?? 'calidad contrastada'} evaluado con ${score}/100 en pureza nutricional.`,
+    description: p.brand?.name
+      ? `${p.name} de ${p.brand.name}. Evaluado con NutriScore ${score}/100 en pureza nutricional.`
+      : `${p.name}. Evaluado con NutriScore ${score}/100 en pureza nutricional.`,
     novaGroup: p.nutritionalInfo?.novaGroup ?? 1,
     sugarsPer100g: p.nutritionalInfo?.sugarsPer100g ?? 0,
     saturatedFatPer100g: p.nutritionalInfo?.saturatedFatPer100g ?? null,
@@ -338,23 +342,21 @@ function mapProductToFrontend(p: {
     purchaseLinks: p.vendorOffers && p.vendorOffers.length > 0 && p.vendorOffers[0]?.currentPrice
       ? p.vendorOffers.map((vo) => ({
           store: vo.storeName || vo.vendorName || 'Amazon.es',
-          url: vo.productUrl || vo.affiliateUrl || `https://www.amazon.es/s?k=${encodeURIComponent((p.name || '') + ' ' + (p.brand?.name || ''))}&tag=nutricompare-21`,
+          url: vo.productUrl || vo.affiliateUrl || `https://www.amazon.es/s?k=${encodeURIComponent(searchTerm)}&tag=nutricompare-21`,
           price: Number(vo.currentPrice),
           highlight: true,
         }))
       : [
           {
             store: 'Amazon.es',
-            url: p.ean
-              ? `https://www.amazon.es/s?k=${encodeURIComponent(p.ean)}&tag=nutricompare-21`
-              : `https://www.amazon.es/s?k=${encodeURIComponent((p.name || '') + ' ' + (p.brand?.name || ''))}&tag=nutricompare-21`,
-            price: priceRaw || 19.99,
+            url: `https://www.amazon.es/s?k=${encodeURIComponent(searchTerm)}&tag=nutricompare-21`,
+            price: priceRaw || 0,
             highlight: true,
           },
           {
             store: 'HSN Store',
-            url: `https://www.hsnstore.com/buscar?q=${encodeURIComponent(p.name || '')}`,
-            price: priceRaw ? +(priceRaw * 0.95).toFixed(2) : 18.99,
+            url: `https://www.hsnstore.com/buscar?q=${encodeURIComponent(searchTerm)}`,
+            price: 0,
             highlight: false,
           },
         ],

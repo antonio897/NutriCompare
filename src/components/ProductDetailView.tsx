@@ -195,12 +195,18 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               {/* Price & Cost Per Dose */}
               <div className="border-t sm:border-t-0 sm:border-l border-[#e0e3e5] pt-2 sm:pt-0 sm:pl-3">
                 <span className="text-[11px] text-[#76777d] block font-medium">Coste / Dosis Real</span>
-                <span className="text-base font-bold text-[#006c49] font-data-tabular">
-                  {product.currency}{product.costPerDose.toFixed(2)}
-                </span>
-                <span className="text-[11px] text-[#76777d] block">
-                  {product.servings} tomas ({product.currency}{product.price.toFixed(2)})
-                </span>
+                {product.price > 0 ? (
+                  <>
+                    <span className="text-base font-bold text-[#006c49] font-data-tabular">
+                      {product.currency}{product.costPerDose.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] text-[#76777d] block">
+                      {product.servings} tomas ({product.currency}{product.price.toFixed(2)})
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-sm font-bold text-[#76777d] italic">Ver precio en tienda</span>
+                )}
               </div>
 
               {/* Purity & Active */}
@@ -297,7 +303,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
             {/* Action Buttons & Retailer CTAs */}
             <div className="space-y-2.5 pt-2">
               <div className="flex flex-wrap gap-2.5">
-                {product.purchaseLinks.map((link, idx) => (
+              {product.purchaseLinks.map((link, idx) => (
                   <a
                     key={idx}
                     href={link.url}
@@ -309,9 +315,13 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                         : 'bg-[#eceef0] hover:bg-[#e0e3e5] text-[#191c1e]'
                     }`}
                   >
-                    <span>Comprar en {link.store}</span>
+                    <span>Buscar en {link.store}</span>
                     <div className="flex items-center gap-1.5 font-data-tabular font-bold">
-                      <span>{product.currency}{link.price.toFixed(2)}</span>
+                      {link.price > 0 ? (
+                        <span>{product.currency}{link.price.toFixed(2)}</span>
+                      ) : (
+                        <span className="italic font-normal opacity-80">Ver precio</span>
+                      )}
                       <ExternalLink className="w-3.5 h-3.5" />
                     </div>
                   </a>

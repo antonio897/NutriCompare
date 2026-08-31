@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useProducts } from './hooks/useProducts';
 import { BLOG_ARTICLES } from './data/blogArticles';
 import { ActiveFilters, CategoryType } from './types';
@@ -217,7 +217,7 @@ export default function App() {
           />
         )}
 
-        {currentView === 'producto' && (
+        {currentView === 'producto' && selectedProduct && (
           <ProductDetailView
             product={selectedProduct}
             onBack={() => setCurrentView('directorio')}
@@ -229,6 +229,17 @@ export default function App() {
               setCurrentView('directorio');
             }}
           />
+        )}
+        {currentView === 'producto' && !selectedProduct && !loading && (
+          <div className="text-center py-20 text-[#76777d]">
+            <p className="text-lg font-semibold">Producto no encontrado</p>
+            <button
+              onClick={() => setCurrentView('directorio')}
+              className="mt-4 px-6 py-2 rounded-full bg-[#006c49] text-white font-semibold hover:bg-[#005a3c] transition-colors"
+            >
+              Volver al directorio
+            </button>
+          </div>
         )}
 
         {currentView === 'rankings' && (

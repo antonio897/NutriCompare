@@ -2,19 +2,19 @@
  * src/components/GlobalSearchModal.tsx
  * 
  * Modal de Búsqueda Global (Command Palette / Spotlight).
- * Permite buscar instantáneamente en todo el catálogo de Neon por nombre, marca, categoría e ingredientes.
- * Accesible con atajo de teclado Ctrl+K / Cmd+K o desde el Header sin perder el contexto de la página.
+ * Busca directamente en la API de Neon con debounce — no solo los productos de la página actual.
+ * Accesible con atajo de teclado Ctrl+K / Cmd+K o desde el Header.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ShieldCheck, Scale, ArrowRight, Sparkles, ExternalLink } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Search, X, Scale, ArrowRight, Loader2 } from 'lucide-react';
 import type { SupplementProduct } from '../types';
 import { getNutriScoreColorClass, formatCurrency } from '../utils/nutriscore';
 
 interface GlobalSearchModalProps {
   isOpen: boolean;
   onClose: () => void;
-  products: SupplementProduct[];
+  products: SupplementProduct[]; // fallback para cuando la API no está disponible
   onSelectProduct: (id: string) => void;
   onToggleCompare: (id: string) => void;
   comparisonIds: string[];
@@ -23,66 +23,122 @@ interface GlobalSearchModalProps {
 export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
   isOpen,
   onClose,
-  products,
+  products: fallbackProducts,
   onSelectProduct,
   onToggleCompare,
   comparisonIds,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [results, setResults] = useState<SupplementProduct[]>([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Focus al abrir y limpiar al cerrar
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 50);
+      // Mostrar todos los productos al abrir (sin filtro)
+      setResults(fallbackProducts.slice(0, 30));
     } else {
       setSearchTerm('');
       setSelectedCategory('All');
+      setResults([]);
+      setLoading(false);
     }
-  }, [isOpen]);
+  }, [isOpen]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Listener para cerrar con Escape
+  // Cerrar con Escape
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
+      if (e.key === 'Escape' && isOpen) onClose();
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, onClose]);
 
+  // Búsqueda con debounce — consulta la API de Neon directamente
+  const fetchResults = useCallback(async (term: string, category: string) => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (term.trim()) params.set('search', term.trim());
+      if (category !== 'All') params.set('category', category);
+      params.set('limit', '40');
+      params.set('page', '1');
+
+      const response = await fetch(`/api/products/list?${params.toString()}`);
+      if (!response.ok) throw new Error('API error');
+
+      const json = await response.json();
+      if (json.data && json.data.length > 0) {
+        setResults(json.data);
+      } else {
+        // Fallback: filtrar los productos locales si la API falla o está vacía
+        const clean = term.toLowerCase().trim();
+        const filtered = fallbackProducts.filter((p) => {
+          const matchCat = category === 'All' || p.category.toLowerCase() === category.toLowerCase();
+          if (!matchCat) return false;
+          if (!clean) return true;
+          return (
+            p.name.toLowerCase().includes(clean) ||
+            p.brand.toLowerCase().includes(clean) ||
+            p.category.toLowerCase().includes(clean)
+          );
+        });
+        setResults(filtered.slice(0, 40));
+      }
+    } catch {
+      // En caso de error (vercel dev no activo, etc.) usar fallback local
+      const clean = term.toLowerCase().trim();
+      const filtered = fallbackProducts.filter((p) => {
+        const matchCat = category === 'All' || p.category.toLowerCase() === category.toLowerCase();
+        if (!matchCat) return false;
+        if (!clean) return true;
+        return (
+          p.name.toLowerCase().includes(clean) ||
+          p.brand.toLowerCase().includes(clean) ||
+          p.category.toLowerCase().includes(clean)
+        );
+      });
+      setResults(filtered.slice(0, 40));
+    } finally {
+      setLoading(false);
+    }
+  }, [fallbackProducts]);
+
+  // Disparar búsqueda al cambiar término o categoría (debounce 300ms)
+  useEffect(() => {
+    if (!isOpen) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      fetchResults(searchTerm, selectedCategory);
+    }, 300);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [searchTerm, selectedCategory, isOpen, fetchResults]);
+
   if (!isOpen) return null;
-
-  const cleanTerm = searchTerm.toLowerCase().trim();
-
-  // Filtrado reactivo en todo el catálogo
-  const results = products.filter((p) => {
-    const matchesCategory = selectedCategory === 'All' || p.category.toLowerCase() === selectedCategory.toLowerCase();
-    if (!matchesCategory) return false;
-
-    if (!cleanTerm) return true;
-
-    return (
-      p.name.toLowerCase().includes(cleanTerm) ||
-      p.brand.toLowerCase().includes(cleanTerm) ||
-      p.category.toLowerCase().includes(cleanTerm) ||
-      p.certifications.some((c) => c.toLowerCase().includes(cleanTerm)) ||
-      p.dietaryTags.some((d) => d.toLowerCase().includes(cleanTerm))
-    );
-  });
 
   const categories = ['All', 'Creatina', 'Proteína', 'Pre-Entreno', 'Magnesio', 'Multivitamínico', 'Omega-3', 'Aminoácidos'];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-150">
-      <div 
+    <div
+      className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-4 sm:p-6 md:p-10 animate-in fade-in duration-150"
+      onClick={onClose}
+    >
+      <div
         className="bg-white rounded-3xl max-w-3xl w-full shadow-2xl border border-[#e0e3e5] overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-150"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Input Bar */}
         <div className="p-4 sm:p-5 border-b border-[#e0e3e5] flex items-center gap-3">
-          <Search className="w-5 h-5 text-[#006c49]" />
+          {loading
+            ? <Loader2 className="w-5 h-5 text-[#006c49] animate-spin shrink-0" />
+            : <Search className="w-5 h-5 text-[#006c49] shrink-0" />
+          }
           <input
             ref={inputRef}
             type="text"
@@ -101,7 +157,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
           )}
           <button
             onClick={onClose}
-            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f2f4f6] text-[#45464d] hover:bg-[#e0e3e5] cursor-pointer"
+            className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f2f4f6] text-[#45464d] hover:bg-[#e0e3e5] cursor-pointer shrink-0"
           >
             ESC
           </button>
@@ -125,8 +181,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
         </div>
 
         {/* Results List */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 divide-y divide-[#f2f4f6] space-y-2">
-          {results.length > 0 ? (
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 divide-y divide-[#f2f4f6]">
+          {loading && results.length === 0 ? (
+            <div className="text-center py-12 space-y-2">
+              <Loader2 className="w-8 h-8 text-[#006c49] animate-spin mx-auto" />
+              <p className="text-sm text-[#76777d]">Buscando en toda la base de datos...</p>
+            </div>
+          ) : results.length > 0 ? (
             results.map((product) => {
               const scoreStyle = getNutriScoreColorClass(product.nutriScore);
               const isCompared = comparisonIds.includes(product.id);
@@ -134,7 +195,7 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
               return (
                 <div
                   key={product.id}
-                  className="pt-2 first:pt-0 flex items-center justify-between gap-4 p-3 rounded-2xl hover:bg-[#f8fafc] transition-colors group cursor-pointer"
+                  className="py-2.5 first:pt-0 flex items-center justify-between gap-4 px-2 rounded-2xl hover:bg-[#f8fafc] transition-colors group cursor-pointer"
                   onClick={() => {
                     onSelectProduct(product.id);
                     onClose();
@@ -146,15 +207,15 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                       alt={product.name}
                       className="w-12 h-12 rounded-xl object-contain bg-white border border-[#e0e3e5] p-1 shrink-0"
                       onError={(e) => {
-                        (e.target as HTMLElement).style.display = 'none';
+                        (e.target as HTMLImageElement).style.display = 'none';
                       }}
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-[#76777d] uppercase tracking-wider font-label-caps truncate">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold text-[#76777d] uppercase tracking-wider truncate">
                           {product.brand}
                         </span>
-                        <span className="text-[10px] text-[#006c49] font-semibold bg-[#6cf8bb]/30 px-2 py-0.2 rounded-full">
+                        <span className="text-[10px] text-[#006c49] font-semibold bg-[#6cf8bb]/30 px-2 py-0.5 rounded-full">
                           {product.category}
                         </span>
                       </div>
@@ -162,9 +223,13 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
                         {product.name}
                       </h4>
                       <div className="flex items-center gap-3 text-xs text-[#76777d] mt-0.5">
-                        <span className="font-bold text-[#191c1e] font-data-tabular">
-                          {formatCurrency(product.price)}
-                        </span>
+                        {product.price > 0 ? (
+                          <span className="font-bold text-[#191c1e] font-data-tabular">
+                            {formatCurrency(product.price)}
+                          </span>
+                        ) : (
+                          <span className="text-[#76777d] italic">Ver precio</span>
+                        )}
                         <span>•</span>
                         <span>{product.purityPct}% Pureza</span>
                       </div>
@@ -208,8 +273,11 @@ export const GlobalSearchModal: React.FC<GlobalSearchModalProps> = ({
 
         {/* Footer info */}
         <div className="p-3 bg-[#f8fafc] border-t border-[#e0e3e5] flex items-center justify-between text-xs text-[#76777d] px-5">
-          <span>{results.length} resultados disponibles</span>
-          <span className="hidden sm:inline">Usa ↑↓ para navegar • ESC para cerrar</span>
+          <span>
+            {loading ? 'Buscando...' : `${results.length} resultados`}
+            {!searchTerm && !loading && ' — escribe para buscar en toda la base de datos'}
+          </span>
+          <span className="hidden sm:inline">ESC para cerrar • clic para ver ficha</span>
         </div>
       </div>
     </div>
