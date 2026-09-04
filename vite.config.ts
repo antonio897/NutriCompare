@@ -19,24 +19,13 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {
         ignored: ['**/.sf/**', '**/data/**', '**/docs/**'],
       },
-      // Proxy /api/* al servidor serverless local (vercel dev corre en :3001)
-      // Si el servidor API no está corriendo, manejamos el error limpiamente sin lanzar ECONNREFUSED ruidoso en consola
-      proxy: process.env.VERCEL_DEV === 'true' ? {} : {
+      // Proxy /api/*: si no se ejecuta vercel dev localmente en el puerto 3001,
+      // reenviar automáticamente a la API en producción en Vercel para disponer de datos reales en local
+      proxy: {
         '/api': {
-          target: 'http://localhost:3001',
+          target: process.env.LOCAL_API === 'true' ? 'http://localhost:3001' : 'https://nutricompare-sigma.vercel.app',
           changeOrigin: true,
-          configure: (proxy) => {
-            proxy.on('error', (_err, _req, res) => {
-              if (res && !('headersSent' in res && res.headersSent)) {
-                try {
-                  res.writeHead(503, { 'Content-Type': 'application/json' });
-                  res.end(JSON.stringify({ error: 'Backend server not running', fallback: true }));
-                } catch {
-                  // socket closed
-                }
-              }
-            });
-          },
+          secure: true,
         },
       },
     },

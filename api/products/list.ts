@@ -31,6 +31,52 @@ const CATEGORY_MAP: Record<string, string[]> = {
   'Multivitamínico': ['multivitamin', 'multivitaminico', 'vitamin'],
 };
 
+// Verificación y auto-migración de columnas para Neon PostgreSQL
+let isSchemaMigrated = false;
+async function ensureSchemaColumns() {
+  if (isSchemaMigrated) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS source_provider VARCHAR(50) DEFAULT 'RAINFOREST';
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS source_id VARCHAR(100);
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS raw_payload JSONB;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS is_bestseller BOOLEAN DEFAULT false;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS bestseller_rank INTEGER;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS rating FLOAT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS ratings_total INTEGER;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS format VARCHAR(50);
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS flavour VARCHAR(100);
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS servings INTEGER;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS package_quantity VARCHAR(100);
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS front_image_url TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS front_small_image_url TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS packaging_image_url TEXT;
+      ALTER TABLE products ADD COLUMN IF NOT EXISTS source_url TEXT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS manufacturing_country VARCHAR(100);
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS ingredients_list TEXT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS nova_group INTEGER DEFAULT 1;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS sugars_per_100g FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS saturated_fat_per_100g FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS salt_per_100g FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS caffeine_mg FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS magnesium_mg FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS potassium_mg FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS zinc_mg FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS calcium_mg FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS iron_mg FLOAT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS vitamins_list JSONB;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS ecoscore_grade VARCHAR(10);
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS additives_count INTEGER DEFAULT 0;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS additives_tags TEXT[] DEFAULT '{}';
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS nutrition_image_url TEXT;
+      ALTER TABLE nutritional_info ADD COLUMN IF NOT EXISTS ingredients_image_url TEXT;
+    `);
+    isSchemaMigrated = true;
+  } catch (err) {
+    console.warn('[api/products/list] Schema migration warning:', err);
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -59,7 +105,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const minScoreNum = parseFloat(minScore) || 0;
 
   try {
-    // Construir filtros WHERE de Prisma — solo mostrar productos de Rainforest API
+    // Asegurar compatibilidad de columnas en la BD
+    await ensureSchemaColumns();
+
+    // Construir filtros WHERE de Prisma
     const where: Record<string, unknown> = {
       asin: { not: null }, // solo productos con ASIN (cosechados de Amazon)
     };
