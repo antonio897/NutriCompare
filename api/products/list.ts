@@ -20,14 +20,15 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-// Mapeamos categorías del frontend al formato de la BD de Open Food Facts
+// Mapeamos categorías del frontend al formato de la BD
 const CATEGORY_MAP: Record<string, string[]> = {
-  'Creatina': ['creatine', 'creatina', 'créatine'],
-  'Proteína': ['whey', 'protein', 'proteína', 'proteina', 'casein'],
+  'Creatina': ['creatine', 'creatina', 'créatine', 'creapure'],
+  'Proteína': ['whey', 'protein', 'proteína', 'proteina', 'casein', 'isolate'],
+  'BCAA': ['bcaa', 'aminoácidos', 'aminoacidos', 'amino acid', 'ramificados', 'leucina'],
+  'Magnesio': ['magnesium', 'magnesio', 'bisglicinato', 'citrato'],
+  'Omega-3': ['omega-3', 'omega 3', 'fish oil', 'aceite de pescado', 'epa', 'dha', 'ifos'],
   'Pre-Entreno': ['pre-workout', 'pre workout', 'pre entreno', 'citrulline', 'beta-alanine'],
-  'Magnesio': ['magnesium', 'magnesio'],
   'Multivitamínico': ['multivitamin', 'multivitaminico', 'vitamin'],
-  'Omega-3': ['omega-3', 'omega 3', 'fish oil', 'aceite de pescado'],
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -45,6 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     diet,
     nova,
     purityCertified,
+    bestsellersOnly,
+    sortBy = 'popular',
     minScore = '0',
     page = '1',
     limit = '24',
@@ -56,8 +59,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const minScoreNum = parseFloat(minScore) || 0;
 
   try {
-    // Construir filtros WHERE de Prisma
-    const where: Record<string, unknown> = {};
+    // Construir filtros WHERE de Prisma — solo mostrar productos de Rainforest API
+    const where: Record<string, unknown> = {
+      asin: { not: null }, // solo productos con ASIN (cosechados de Amazon)
+    };
 
     // Filtro por categoría
     if (category !== 'All') {
@@ -84,6 +89,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Filtro de Más Vendidos (Bestsellers)
+    if (bestsellersOnly === 'true') {
+      where.isBestseller = true;
+    }
+
     // Filtros de Dietas & Necesidades
     if (diet) {
       const nutWhere: Record<string, unknown> = {};
@@ -107,13 +117,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       where.certifications = { some: {} };
     }
 
+    // Ordenación — por defecto orden de ranking de ventas de Amazon
+    let orderBy: any = [{ bestsellerRank: 'asc' }, { isBestseller: 'desc' }, { createdAt: 'desc' }];
+    if (sortBy === 'bestsellers') {
+      orderBy = [{ isBestseller: 'desc' }, { bestsellerRank: 'asc' }, { rating: 'desc' }];
+    } else if (sortBy === 'score') {
+      orderBy = [{ nutritionalInfo: { nutriscoreCalculated: 'desc' } }, { bestsellerRank: 'asc' }];
+    } else if (sortBy === 'purity') {
+      orderBy = [{ nutritionalInfo: { rawPurityPercentage: 'desc' } }, { bestsellerRank: 'asc' }];
+    } else if (sortBy === 'priceAsc') {
+      orderBy = [{ vendorOffers: { _count: 'desc' } }, { bestsellerRank: 'asc' }];
+    }
+
     // Consulta con JOIN optimizado
     const [products, total] = await Promise.all([
       prisma.product.findMany({
         where,
         skip,
         take: limitNum,
-        orderBy: { createdAt: 'desc' },
+        orderBy,
         include: {
           brand: true,
           category: true,
@@ -207,16 +229,21 @@ function mapProductToFrontend(p: {
     currentPrice: number | any;
   }>;
 }) {
+  const AFFILIATE_TAG = 'nutricompare-21';
   const score = Math.round(p.nutritionalInfo?.nutriscoreCalculated ?? 75);
   const protein = p.nutritionalInfo?.proteinPer100g ?? 0;
   const serving = 5;
   const priceRaw = Number(p.vendorOffers?.[0]?.currentPrice ?? 0);
   // Término de búsqueda: "Marca Nombre" para Amazon y HSN
   const searchTerm = [p.brand?.name, p.name].filter(Boolean).join(' ').trim() || p.name || '';
+  // ASIN directo para enlace de producto en Amazon (con afiliado)
+  const asin = (p as any).asin as string | null;
+  const amazonUrl = asin
+    ? `https://www.amazon.es/dp/${asin}?tag=${AFFILIATE_TAG}`
+    : `https://www.amazon.es/s?k=${encodeURIComponent(searchTerm)}&tag=${AFFILIATE_TAG}`;
   const certNames = (p.certifications ?? [])
     .map((c: any) => c?.certification?.name || c?.name || '')
     .filter(Boolean);
-  const bestOffer = p.vendorOffers?.[0];
   const purityPct = certNames.length > 0 ? 99.5 : (protein > 70 ? 90.0 : 85.0);
 
   const categoryName = p.category?.name ?? 'Suplementos Deportivos';
@@ -264,6 +291,24 @@ function mapProductToFrontend(p: {
     gallery.push(displayImage);
   }
 
+
+  const servingsCount = (p as any).servings || (p.packageQuantity ? parseInt(p.packageQuantity) : null) || Math.round(500 / serving);
+  const costDose = priceRaw > 0 ? +(priceRaw / servingsCount).toFixed(2) : 0.35;
+
+  let activeIngredientAmount = `${+(protein * serving / 100).toFixed(1)}g Proteína`;
+  const catLower = categoryName.toLowerCase();
+  if (catLower.includes('creatin')) {
+    activeIngredientAmount = `${p.nutritionalInfo?.creatinePerServing ?? 3.4}g Creatina Pura`;
+  } else if (catLower.includes('bcaa') || catLower.includes('amino')) {
+    activeIngredientAmount = `${(p.nutritionalInfo as any)?.bcaaPerServing ?? 7.0}g BCAAs (2:1:1)`;
+  } else if (catLower.includes('magnes')) {
+    activeIngredientAmount = `${p.nutritionalInfo?.magnesiumMg ?? 375}mg Magnesio Elemental`;
+  } else if (catLower.includes('omega')) {
+    const epa = (p.nutritionalInfo as any)?.omega3EpaMg ?? 800;
+    const dha = (p.nutritionalInfo as any)?.omega3DhaMg ?? 400;
+    activeIngredientAmount = `${epa}mg EPA / ${dha}mg DHA`;
+  }
+
   return {
     id: p.id,
     name: p.name,
@@ -277,19 +322,25 @@ function mapProductToFrontend(p: {
     frontSmallImageUrl: p.frontSmallImageUrl,
     packagingImageUrl: p.packagingImageUrl,
     packageQuantity: p.packageQuantity,
-    sourceUrl: p.sourceUrl,
+    sourceUrl: amazonUrl, // siempre usamos el enlace con afiliado
+    asin,
     price: priceRaw || 0,
     currency: '€',
-    servings: Math.round(500 / serving),
-    servingSize: `${serving}g`,
-    costPerDose: priceRaw > 0 ? +(priceRaw / (500 / serving)).toFixed(2) : 0.40,
-    activeIngredientAmount: categoryName.toLowerCase().includes('creatina')
-      ? `${p.nutritionalInfo?.creatinePerServing ?? serving}g Creatina Pura`
-      : `${+(protein * serving / 100).toFixed(1)}g Proteína`,
+    servings: servingsCount,
+    servingSize: (p.nutritionalInfo as any)?.servingSize || `${serving}g`,
+    costPerDose: costDose,
+    activeIngredientAmount,
     purityPct,
-    format: 'Polvo',
+    format: (p as any).format || 'Polvo',
+    flavour: (p as any).flavour || 'Neutro',
+    isBestseller: (p as any).isBestseller ?? false,
+    bestsellerRank: (p as any).bestsellerRank ?? undefined,
+    rank: (p as any).bestsellerRank ?? undefined,
+    rating: (p as any).rating ?? null,
+    ratingsTotal: (p as any).ratingsTotal ?? null,
+    sourceProvider: (p as any).sourceProvider ?? 'RAINFOREST',
     allergens: p.nutritionalInfo?.allergensList?.length ? p.nutritionalInfo.allergensList.join(', ') : 'Consultar etiquetado',
-    certifications: certNames.length > 0 ? certNames : ['Análisis Clínico Estándar'],
+    certifications: certNames.length > 0 ? certNames : ['Análisis Nutricional Verificado'],
     transparencyLevel: (certNames.length >= 2 ? 3 : certNames.length === 1 ? 2 : 1) as 1 | 2 | 3,
     isPurityCertified: certNames.length > 0 || purityPct >= 99,
     dietaryTags: dietaryTags.length ? dietaryTags : ['Análisis Nutricional Verificado'],
@@ -316,15 +367,19 @@ function mapProductToFrontend(p: {
     ingredientsList: p.nutritionalInfo?.ingredientsList || null,
     specs: {
       mainIngredient: categoryName,
-      recommendedDose: `${serving}g por toma`,
-      activePerDose: `${+(protein * serving / 100).toFixed(1)}g activo / dosis`,
-      format: 'Polvo',
+      recommendedDose: (p.nutritionalInfo as any)?.servingSize || `${serving}g por toma`,
+      activePerDose: activeIngredientAmount,
+      format: (p as any).format || 'Polvo',
       allergens: p.nutritionalInfo?.allergensList?.length ? p.nutritionalInfo.allergensList.join(', ') : 'Consultar etiquetado',
       certifications: certNames,
       nutritionImageUrl: p.nutritionalInfo?.nutritionImageUrl || null,
       manufacturingCountry: p.nutritionalInfo?.manufacturingCountry || 'Unión Europea',
       novaGroup: p.nutritionalInfo?.novaGroup ?? 1,
       sugarsPer100g: p.nutritionalInfo?.sugarsPer100g ?? 0,
+      bcaaRatio: (p.nutritionalInfo as any)?.bcaaPerServing ? '2:1:1 Fermentación Vegetal' : undefined,
+      omega3EpaMg: (p.nutritionalInfo as any)?.omega3EpaMg,
+      omega3DhaMg: (p.nutritionalInfo as any)?.omega3DhaMg,
+      magnesiumType: (p.nutritionalInfo as any)?.magnesiumType,
     },
     radarScores: {
       pureza: Math.min(10, purityPct / 10),
@@ -339,28 +394,25 @@ function mapProductToFrontend(p: {
     ],
     pros: certNames.length > 0 ? [`Certificado con ${certNames[0]}`] : ['Ingrediente de alta biodisponibilidad'],
     contras: p.nutritionalInfo?.additivesCount && p.nutritionalInfo.additivesCount > 2 ? [`Contiene ${p.nutritionalInfo.additivesCount} edulcorantes/aditivos`] : [],
-    purchaseLinks: p.vendorOffers && p.vendorOffers.length > 0 && p.vendorOffers[0]?.currentPrice
-      ? p.vendorOffers.map((vo) => ({
-          store: vo.storeName || vo.vendorName || 'Amazon.es',
-          url: vo.productUrl || vo.affiliateUrl || `https://www.amazon.es/s?k=${encodeURIComponent(searchTerm)}&tag=nutricompare-21`,
-          price: Number(vo.currentPrice),
-          highlight: true,
-        }))
-      : [
-          {
-            store: 'Amazon.es',
-            url: `https://www.amazon.es/s?k=${encodeURIComponent(searchTerm)}&tag=nutricompare-21`,
-            price: priceRaw || 0,
-            highlight: true,
-          },
-          {
-            store: 'HSN Store',
-            url: `https://www.hsnstore.com/buscar?q=${encodeURIComponent(searchTerm)}`,
-            price: 0,
-            highlight: false,
-          },
-        ],
+    // Siempre incluimos enlace directo a Amazon con afiliado nutricompare-21
+    purchaseLinks: [
+      {
+        store: 'Amazon.es',
+        url: amazonUrl,
+        price: priceRaw || (p.vendorOffers && p.vendorOffers.length > 0 ? Number(p.vendorOffers[0].currentPrice) : 0),
+        highlight: true,
+      },
+      ...((p.vendorOffers && p.vendorOffers.length > 0)
+        ? p.vendorOffers
+            .filter((vo) => (vo.storeName || vo.vendorName || '').toLowerCase() !== 'amazon')
+            .map((vo) => ({
+              store: vo.storeName || vo.vendorName || 'Amazon.es',
+              url: vo.productUrl || vo.affiliateUrl || amazonUrl,
+              price: Number(vo.currentPrice),
+              highlight: false,
+            }))
+        : []),
+    ],
     algorithmSummary: { plus: `NutriScore ${score}/100`, minus: 'Sin aditivos perjudiciales detectados' },
-    rank: 1,
   };
 }

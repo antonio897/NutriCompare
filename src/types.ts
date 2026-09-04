@@ -1,4 +1,14 @@
-export type CategoryType = 'Creatina' | 'Proteína' | 'Pre-Entreno' | 'Multivitamínico' | 'Magnesio' | 'Omega-3' | 'Aminoácidos' | 'Suplementos Deportivos' | (string & {});
+export type CategoryType =
+  | 'Creatina'
+  | 'Proteína'
+  | 'BCAA'
+  | 'Magnesio'
+  | 'Omega-3'
+  | 'Pre-Entreno'
+  | 'Multivitamínico'
+  | 'Aminoácidos'
+  | 'Suplementos Deportivos'
+  | (string & {});
 
 export interface SupplementProduct {
   id: string;
@@ -17,12 +27,18 @@ export interface SupplementProduct {
   activeIngredientAmount: string; // e.g. "3.0g Creatina pura"
   purityPct: number; // e.g. 99.9
   format: string; // e.g. "Polvo sin sabor", "Cápsulas"
+  flavour?: string; // e.g. "Chocolate", "Neutro"
   allergens: string; // e.g. "Libre de gluten, soja y lácteos"
   certifications: string[]; // e.g. ["Creapure®", "Informed Sport", "Third-Party Tested"]
   transparencyLevel: 1 | 2 | 3 | number; // 1: Blends, 2: Partial, 3: Full Disclosure
   isPurityCertified: boolean;
   dietaryTags: string[]; // ["Sin Gluten", "Vegano", "Sin Lactosa", "Cero Azúcar"]
   description: string;
+  isBestseller?: boolean;
+  bestsellerRank?: number;
+  rating?: number;
+  ratingsTotal?: number;
+  sourceProvider?: string;
   specs: {
     mainIngredient: string;
     recommendedDose: string;
@@ -111,6 +127,10 @@ export interface SupplementProduct {
     minus: string;
   };
   rank?: number;
+  asin?: string | null;
+  magnesiumMg?: number | null;
+  potassiumMg?: number | null;
+  zincMg?: number | null;
 }
 
 export interface BlogArticle {
@@ -130,9 +150,10 @@ export interface BlogArticle {
 export interface ActiveFilters {
   category?: CategoryType | 'All';
   purityCertifiedOnly: boolean;
+  bestsellersOnly?: boolean;
   dietaryNeed?: string;
   novaGroup?: number;
   minScore: number;
   searchQuery: string;
-  sortBy: 'popular' | 'score' | 'priceAsc' | 'purity';
+  sortBy: 'popular' | 'score' | 'priceAsc' | 'purity' | 'bestsellers';
 }

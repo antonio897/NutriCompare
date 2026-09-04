@@ -39,7 +39,15 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const availableToAdd = allProducts.filter(p => !products.some(cp => cp.id === p.id));
+  // Categoría bloqueada: la primera categoría de los productos en comparativa
+  const lockedCategory = products.length > 0 ? products[0].category : null;
+
+  // Solo mostrar productos de la misma categoría que los actuales en comparativa
+  const availableToAdd = allProducts.filter(p => {
+    if (products.some(cp => cp.id === p.id)) return false;
+    if (lockedCategory && p.category !== lockedCategory) return false;
+    return true;
+  });
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -122,6 +130,16 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
             <p className="text-sm text-[#45464d] mt-1">
               Puntaje NutriScore, pureza certificada y coste por dosis normalizada de grado clínico.
             </p>
+            {/* Category lock indicator */}
+            {lockedCategory && (
+              <div className="flex items-center gap-1.5 mt-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#565e74] bg-[#eceef0] px-2.5 py-1 rounded-lg flex items-center gap-1.5">
+                  <ShieldCheck className="w-3 h-3 text-[#006c49]" />
+                  Comparando: <strong className="text-[#191c1e]">{lockedCategory}</strong>
+                  <Info className="w-3 h-3 text-[#76777d]" title={`Solo puedes añadir productos de la categoría ${lockedCategory}`} />
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action buttons */}
@@ -327,7 +345,10 @@ export const ComparisonView: React.FC<ComparisonViewProps> = ({
                 <td className="p-4 font-medium text-[#45464d]">Formato y Presentación</td>
                 {products.map((p) => (
                   <td key={p.id} className="p-4 border-l border-[#e0e3e5] text-[#191c1e]">
-                    {p.format}
+                    <span>{p.format}</span>
+                    {p.flavour && (
+                      <span className="block text-[11px] text-[#76777d] font-normal">Sabor: {p.flavour}</span>
+                    )}
                   </td>
                 ))}
                 {products.length < 4 && <td className="border-l border-[#e0e3e5]"></td>}

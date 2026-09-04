@@ -19,6 +19,14 @@ import {
   Activity,
   Microscope,
   ExternalLink as LinkIcon,
+  Trophy,
+  Star,
+  Tag,
+  Globe,
+  Layers,
+  Barcode,
+  Flame,
+  Leaf,
 } from 'lucide-react';
 import { SupplementProduct } from '../types';
 import { getNutriScoreColorClass } from '../utils/nutriscore';
@@ -122,7 +130,13 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                 alt={product.name} 
                 className="max-h-full max-w-full object-contain transition-transform duration-300 group-hover:scale-105"
               />
-              <div className="absolute top-3 left-3">
+              <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
+                {product.isBestseller && (
+                  <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-500 text-white flex items-center gap-1 shadow-xs uppercase">
+                    <Trophy className="w-3.5 h-3.5 text-amber-100" />
+                    #{product.bestsellerRank || 1} Más Vendido
+                  </span>
+                )}
                 <span className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[#006c49] text-white flex items-center gap-1 shadow-xs">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   Auditado
@@ -167,6 +181,26 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
               <h1 className="text-2xl sm:text-3xl font-bold text-[#191c1e] tracking-tight">
                 {product.name}
               </h1>
+
+              {product.rating && (
+                <div className="flex items-center gap-1.5 text-xs text-amber-600 font-semibold mt-1.5">
+                  <div className="flex items-center">
+                    <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    <span className="ml-1 text-sm font-bold text-[#191c1e]">{product.rating.toFixed(1)} / 5</span>
+                  </div>
+                  {product.ratingsTotal && (
+                    <span className="text-[#76777d] font-normal text-xs">
+                      • {product.ratingsTotal.toLocaleString()} valoraciones verificadas en Amazon
+                    </span>
+                  )}
+                  {(product.bestsellerRank || product.rank) && (
+                    <span className="ml-1 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
+                      <Trophy className="w-3 h-3" />
+                      #{product.bestsellerRank || product.rank} en {product.category}
+                    </span>
+                  )}
+                </div>
+              )}
               
               <p className="text-sm text-[#45464d] mt-2 leading-relaxed">
                 {product.description}
@@ -315,7 +349,7 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
                         : 'bg-[#eceef0] hover:bg-[#e0e3e5] text-[#191c1e]'
                     }`}
                   >
-                    <span>Buscar en {link.store}</span>
+                    <span>{link.highlight ? 'Ver oferta en' : 'Buscar en'} {link.store}</span>
                     <div className="flex items-center gap-1.5 font-data-tabular font-bold">
                       {link.price > 0 ? (
                         <span>{product.currency}{link.price.toFixed(2)}</span>
@@ -359,36 +393,102 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           </div>
 
           <dl className="divide-y divide-[#f2f4f6] text-xs">
-            <div className="py-2.5 flex justify-between gap-4">
-              <dt className="text-[#76777d] font-medium">Ingrediente Principal</dt>
-              <dd className="font-semibold text-[#191c1e] text-right">{product.specs.mainIngredient}</dd>
-            </div>
-            <div className="py-2.5 flex justify-between gap-4">
-              <dt className="text-[#76777d] font-medium">Dosis Recomendada</dt>
-              <dd className="font-semibold text-[#191c1e] text-right">{product.specs.recommendedDose}</dd>
-            </div>
-            <div className="py-2.5 flex justify-between gap-4">
-              <dt className="text-[#76777d] font-medium">Activo Puro por Toma</dt>
-              <dd className="font-semibold text-[#006c49] text-right">{product.specs.activePerDose}</dd>
-            </div>
-            <div className="py-2.5 flex justify-between gap-4">
-              <dt className="text-[#76777d] font-medium">Formato / Textura</dt>
-              <dd className="font-semibold text-[#191c1e] text-right">{product.specs.format}</dd>
-            </div>
-            <div className="py-2.5 flex justify-between gap-4">
-              <dt className="text-[#76777d] font-medium">Alérgenos</dt>
-              <dd className="font-semibold text-[#45464d] text-right">{product.specs.allergens}</dd>
-            </div>
-            <div className="py-2.5 flex justify-between gap-4">
-              <dt className="text-[#76777d] font-medium">Sellos de Calidad</dt>
-              <dd className="flex flex-wrap justify-end gap-1">
-                {product.specs.certifications.map((c, i) => (
-                  <span key={i} className="px-2 py-0.5 rounded bg-[#dae2fd] text-[#131b2e] font-semibold text-[11px]">
-                    {c}
+            {product.specs.mainIngredient && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Ingrediente Principal</dt>
+                <dd className="font-semibold text-[#191c1e] text-right">{product.specs.mainIngredient}</dd>
+              </div>
+            )}
+            {product.specs.recommendedDose && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Dosis Recomendada</dt>
+                <dd className="font-semibold text-[#191c1e] text-right">{product.specs.recommendedDose}</dd>
+              </div>
+            )}
+            {product.specs.activePerDose && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Activo Puro por Toma</dt>
+                <dd className="font-semibold text-[#006c49] text-right">{product.specs.activePerDose}</dd>
+              </div>
+            )}
+            {product.flavour && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Sabor / Variedad</dt>
+                <dd className="font-semibold text-[#191c1e] text-right">{product.flavour}</dd>
+              </div>
+            )}
+            {product.specs.format && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Formato / Textura</dt>
+                <dd className="font-semibold text-[#191c1e] text-right">{product.specs.format}</dd>
+              </div>
+            )}
+            {product.packageQuantity && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Contenido Neto / Envase</dt>
+                <dd className="font-semibold text-[#191c1e] text-right font-data-tabular">{product.packageQuantity}</dd>
+              </div>
+            )}
+            {product.servings > 0 && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Tomas / Servicios Totales</dt>
+                <dd className="font-semibold text-[#191c1e] text-right font-data-tabular">
+                  {product.servings} servicios ({product.servingSize})
+                </dd>
+              </div>
+            )}
+            {product.specs.allergens && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Alérgenos</dt>
+                <dd className="font-semibold text-[#45464d] text-right">{product.specs.allergens}</dd>
+              </div>
+            )}
+            {product.specs.certifications && product.specs.certifications.length > 0 && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Sellos de Calidad</dt>
+                <dd className="flex flex-wrap justify-end gap-1">
+                  {product.specs.certifications.map((c, i) => (
+                    <span key={i} className="px-2 py-0.5 rounded bg-[#dae2fd] text-[#131b2e] font-semibold text-[11px]">
+                      {c}
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            )}
+            {product.novaGroup != null && (
+              <div className="py-2.5 flex justify-between gap-4 items-center">
+                <dt className="text-[#76777d] font-medium">Clasificación NOVA</dt>
+                <dd className="text-right">
+                  <span className={`px-2 py-0.5 rounded font-bold text-[11px] ${
+                    product.novaGroup === 1 ? 'bg-emerald-100 text-emerald-800' :
+                    product.novaGroup === 2 ? 'bg-blue-100 text-blue-800' :
+                    product.novaGroup === 3 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    NOVA {product.novaGroup} ({
+                      product.novaGroup === 1 ? 'Sin procesar' :
+                      product.novaGroup === 2 ? 'Ingrediente culinario' :
+                      product.novaGroup === 3 ? 'Procesado' : 'Ultraprocesado'
+                    })
                   </span>
-                ))}
-              </dd>
-            </div>
+                </dd>
+              </div>
+            )}
+            {(product.manufacturingCountry || product.specs.manufacturingCountry) && (
+              <div className="py-2.5 flex justify-between gap-4">
+                <dt className="text-[#76777d] font-medium">Origen / Fabricación</dt>
+                <dd className="font-semibold text-[#191c1e] text-right">
+                  {product.manufacturingCountry || product.specs.manufacturingCountry}
+                </dd>
+              </div>
+            )}
+            {product.asin && (
+              <div className="py-2.5 flex justify-between gap-4 items-center">
+                <dt className="text-[#76777d] font-medium">Identificador Amazon ASIN</dt>
+                <dd className="font-mono text-xs text-[#006c49] font-bold text-right bg-[#f2f4f6] px-2 py-0.5 rounded">
+                  {product.asin}
+                </dd>
+              </div>
+            )}
           </dl>
         </div>
 
@@ -644,6 +744,49 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           </div>
         </div>
 
+        {/* Tabla de Macronutrientes por 100g (si hay datos disponibles) */}
+        <div className="pt-2 border-t border-[#f0f3f5] space-y-2">
+          <span className="text-[11px] font-bold text-[#76777d] uppercase tracking-wider block font-label-caps">
+            Perfil Nutricional por 100g:
+          </span>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+            <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+              <span className="text-[#76777d] block text-[11px]">Proteína</span>
+              <span className="text-base font-bold text-[#006c49] font-data-tabular">
+                {product.specs.proteinPct ? `${product.specs.proteinPct}g` : `${product.purityPct}%`}
+              </span>
+              <span className="text-[10px] text-[#76777d] block">Concentración activa</span>
+            </div>
+            <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+              <span className="text-[#76777d] block text-[11px]">Azúcares</span>
+              <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                {(product.sugarsPer100g ?? 0.5).toFixed(1)}g
+              </span>
+              <span className="text-[10px] text-emerald-700 font-semibold block">
+                {(product.sugarsPer100g ?? 0) <= 2 ? 'Bajo en azúcar' : 'Controlado'}
+              </span>
+            </div>
+            {product.saturatedFatPer100g != null && (
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[#76777d] block text-[11px]">Grasas Saturadas</span>
+                <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                  {product.saturatedFatPer100g.toFixed(1)}g
+                </span>
+                <span className="text-[10px] text-[#76777d] block">por 100g</span>
+              </div>
+            )}
+            {product.saltPer100g != null && (
+              <div className="p-3 rounded-xl bg-[#f8fafc] border border-[#e0e3e5]">
+                <span className="text-[#76777d] block text-[11px]">Sal / Sodio</span>
+                <span className="text-base font-bold text-[#191c1e] font-data-tabular">
+                  {product.saltPer100g.toFixed(2)}g
+                </span>
+                <span className="text-[10px] text-[#76777d] block">Conforme EFSA</span>
+              </div>
+            )}
+          </div>
+        </div>
+
         {product.additivesTags && product.additivesTags.length > 0 && (
           <div className="pt-2 border-t border-[#f0f3f5] space-y-1">
             <span className="text-[11px] font-bold text-[#76777d] uppercase tracking-wider block font-label-caps">
@@ -659,6 +802,30 @@ export const ProductDetailView: React.FC<ProductDetailViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* ── Bloque: Lista Oficial y Completa de Ingredientes de Etiqueta ── */}
+      {product.ingredientsList && product.ingredientsList.trim().length > 0 && (
+        <div className="bg-white rounded-3xl p-6 sm:p-7 border border-[#e0e3e5] shadow-xs space-y-3">
+          <div className="flex items-center justify-between border-b border-[#e0e3e5] pb-3">
+            <h3 className="text-sm font-bold text-[#191c1e] flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#006c49]" />
+              Lista Completa de Ingredientes (Etiqueta Oficial)
+            </h3>
+            <span className="text-[11px] font-medium text-[#76777d] bg-[#f2f4f6] px-2.5 py-1 rounded-full">
+              Declaración obligatoria UE
+            </span>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-[#f8fafc] border border-[#e0e3e5] text-xs leading-relaxed text-[#191c1e]">
+            {product.ingredientsList}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-[#76777d]">
+            <span className="font-semibold text-[#191c1e]">Alérgenos e intolerancias:</span>
+            <span>{product.allergens || product.specs.allergens || 'Consultar etiquetado en envase'}</span>
+          </div>
+        </div>
+      )}
 
       {/* ── Bloque: Micronutrientes y Vitaminas Detectadas ── */}
       {product.vitaminsList && Object.keys(product.vitaminsList).length > 0 && (

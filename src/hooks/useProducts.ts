@@ -7,7 +7,28 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { SupplementProduct, ActiveFilters } from '../types';
+import { RAINFOREST_PROTEIN_PRODUCTS } from '../data/rainforest-products';
 import { SUPPLEMENT_PRODUCTS as MOCK_PRODUCTS } from '../data/supplements';
+import { normalizeProductRanks } from '../utils/productRanking';
+
+// Combinamos los productos reales de Amazon (Rainforest) con el catálogo multicategoría (Creatina, Magnesio, etc.)
+const RAW_FALLBACK: SupplementProduct[] = [
+  ...RAINFOREST_PROTEIN_PRODUCTS.map(p => ({
+    ...p,
+    // Normalizar si viene en escala 0-100 para que coincida con el rango de la app (0-10)
+    nutriScore: p.nutriScore > 10 ? +(p.nutriScore / 10).toFixed(1) : p.nutriScore,
+    novaGroup: p.novaGroup || (p.ingredientsList?.includes('sucralosa') || p.ingredientsList?.includes('aroma') ? 3 : 1),
+  })),
+  ...MOCK_PRODUCTS.filter(p => p.category !== 'Proteína').map(p => ({
+    ...p,
+    novaGroup: p.novaGroup || (p.category === 'Creatina' && p.name.includes('Creapure') ? 1 : 2),
+  })),
+];
+
+const FALLBACK_PRODUCTS: SupplementProduct[] = normalizeProductRanks(RAW_FALLBACK);
+
+// Indicador a nivel de sesión/módulo: si el backend no está corriendo, no reintentar
+let isBackendOffline = false;
 
 interface ProductsApiResponse {
   data: SupplementProduct[];
@@ -42,6 +63,12 @@ export function useProducts(filters: ActiveFilters): UseProductsResult {
 
   // Función principal de carga desde API
   const fetchFromAPI = useCallback(async (currentPage: number, append = false) => {
+    if (isBackendOffline) {
+      fallbackToMock();
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -56,6 +83,8 @@ export function useProducts(filters: ActiveFilters): UseProductsResult {
       params.set('diet', dietSlug);
     }
     if (filters.novaGroup) params.set('nova', String(filters.novaGroup));
+    if (filters.bestsellersOnly) params.set('bestsellersOnly', 'true');
+    if (filters.sortBy) params.set('sortBy', filters.sortBy);
     params.set('page', String(currentPage));
     params.set('limit', '24');
 
@@ -80,25 +109,27 @@ export function useProducts(filters: ActiveFilters): UseProductsResult {
       setHasMore(json.meta.hasMore);
 
       if (append) {
-        setProducts((prev) => [...prev, ...json.data]);
+        setProducts((prev) => normalizeProductRanks([...prev, ...json.data]));
       } else {
-        setProducts(json.data);
+        setProducts(normalizeProductRanks(json.data));
       }
     } catch (err) {
-      console.warn('[useProducts] API no disponible, usando datos de demostración:', err);
+      isBackendOffline = true;
       fallbackToMock();
     } finally {
       setLoading(false);
     }
   }, [filters]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fallback automático al dataset mockup (supplements.ts)
+  // Fallback automático al dataset de Rainforest (o mock si no existe)
   const fallbackToMock = useCallback(() => {
     setUsingMockData(true);
-    const filtered = MOCK_PRODUCTS.filter((prod) => {
+    const filtered = FALLBACK_PRODUCTS.filter((prod) => {
       if (filters.category !== 'All' && prod.category !== filters.category) return false;
       if (filters.purityCertifiedOnly && !prod.isPurityCertified) return false;
+      if (filters.bestsellersOnly && !prod.isBestseller && (prod.rank && prod.rank > 2)) return false;
       if (filters.dietaryNeed && !prod.dietaryTags.includes(filters.dietaryNeed)) return false;
+      if (filters.novaGroup && (prod.novaGroup || 1) !== filters.novaGroup) return false;
       if (filters.minScore > 0 && prod.nutriScore < filters.minScore) return false;
       if (filters.searchQuery?.trim()) {
         const q = filters.searchQuery.toLowerCase();
@@ -125,6 +156,8 @@ export function useProducts(filters: ActiveFilters): UseProductsResult {
     filters.category,
     filters.searchQuery,
     filters.purityCertifiedOnly,
+    filters.bestsellersOnly,
+    filters.sortBy,
     filters.minScore,
     filters.dietaryNeed,
     filters.novaGroup,

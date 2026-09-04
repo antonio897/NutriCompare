@@ -7,7 +7,8 @@ import {
   History, 
   X, 
   SlidersHorizontal,
-  RotateCcw
+  RotateCcw,
+  Trophy
 } from 'lucide-react';
 import { CategoryType, ActiveFilters } from '../types';
 
@@ -33,6 +34,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const hasActiveFilters = 
     filters.category !== 'All' || 
     filters.purityCertifiedOnly || 
+    filters.bestsellersOnly ||
     Boolean(filters.dietaryNeed) || 
     filters.minScore > 0 || 
     Boolean(filters.searchQuery);
@@ -47,9 +49,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </p>
 
         <button
-          onClick={() => onFilterChange({ category: 'All', purityCertifiedOnly: false, dietaryNeed: undefined })}
+          onClick={() => onFilterChange({ category: 'All', purityCertifiedOnly: false, dietaryNeed: undefined, bestsellersOnly: false })}
           className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
-            filters.category === 'All' && !filters.purityCertifiedOnly && !filters.dietaryNeed
+            filters.category === 'All' && !filters.purityCertifiedOnly && !filters.dietaryNeed && !filters.bestsellersOnly
               ? 'bg-[#eceef0] text-[#191c1e] font-semibold'
               : 'text-[#45464d] hover:bg-[#f2f4f6] hover:text-[#191c1e]'
           }`}
@@ -60,6 +62,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </span>
           <span className="text-xs font-data-tabular text-[#76777d] bg-[#f2f4f6] px-2 py-0.5 rounded-full">
             {totalProductsCount}
+          </span>
+        </button>
+
+        <button
+          onClick={() => onFilterChange({ bestsellersOnly: !filters.bestsellersOnly })}
+          className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+            filters.bestsellersOnly
+              ? 'bg-amber-100 text-amber-900 font-semibold'
+              : 'text-[#45464d] hover:bg-amber-50/50 hover:text-[#191c1e]'
+          }`}
+        >
+          <span className="flex items-center gap-2.5">
+            <Trophy className="w-4 h-4 text-amber-600" />
+            Más Vendidos
+          </span>
+          <span className="text-[10px] font-bold bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded">
+            Top
           </span>
         </button>
 
@@ -111,6 +130,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-1.5">
+            {filters.bestsellersOnly && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-100 text-amber-900">
+                🏆 Más Vendidos
+                <button 
+                  onClick={() => onFilterChange({ bestsellersOnly: false })}
+                  className="hover:text-red-600 cursor-pointer"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+
             {filters.category && filters.category !== 'All' && (
               <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-[#eceef0] text-[#191c1e]">
                 Tipo: {filters.category}
@@ -121,6 +152,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <X className="w-3 h-3" />
                 </button>
               </span>
+
             )}
 
             {filters.purityCertifiedOnly && (

@@ -27,13 +27,15 @@ model Category {
   slug        String    @unique
   description String?
   products    Product[]
+  rankings    CategoryRanking[]
 
   @@map("categories")
 }
 
 model Product {
   id                 String           @id @default(cuid())
-  ean                String           @unique // Código de barras EAN/UPC clave para cruzar datos sin ambigüedad
+  ean                String?          @unique // Código de barras EAN/UPC (opcional para productos obtenidos por ASIN)
+  asin               String?          @unique // Amazon Standard Identification Number
   name               String
   slug               String           @unique
   brandId            String?          @map("brand_id")
@@ -43,7 +45,17 @@ model Product {
   frontSmallImageUrl String?          @map("front_small_image_url") // URL 200px oficial con rev
   packagingImageUrl  String?          @map("packaging_image_url") // URL de la foto del envase
   packageQuantity    String?          @map("package_quantity") // Ej: "500 g", "1 kg", "120 cápsulas"
-  sourceUrl          String?          @map("source_url") // URL origen (ficha Open Food Facts / fabricante)
+  sourceUrl          String?          @map("source_url") // URL origen (ficha Open Food Facts / Amazon / fabricante)
+  sourceProvider     String           @default("RAINFOREST") @map("source_provider") // "RAINFOREST", "OPENFOODFACTS", "SCRAPERAPI", etc.
+  sourceId           String?          @map("source_id") // ASIN o barcode de origen
+  isBestseller       Boolean          @default(false) @map("is_bestseller")
+  bestsellerRank     Int?             @map("bestseller_rank") // Puesto #1, #2... en su categoría
+  rating             Float?           // Valoración media en estrellas (0.0 a 5.0)
+  ratingsTotal       Int?             @map("ratings_total") // Cantidad total de reviews/opiniones
+  format             String?          // Ej: "Polvo", "Cápsulas", "Comprimidos"
+  flavour            String?          // Ej: "Sin Sabor / Neutro", "Chocolate", "Vainilla"
+  servings           Int?             // Número total de dosis/tomas por envase
+  rawPayload         Json?            @map("raw_payload") // JSON original para trazabilidad y cero pérdidas
   isActive           Boolean          @default(true) @map("is_active")
   createdAt          DateTime         @default(now()) @map("created_at")
   updatedAt          DateTime         @updatedAt @map("updated_at")
@@ -55,12 +67,33 @@ model Product {
   vendorOffers    VendorOffer[]
   certifications  ProductCertification[]
   labReports      LabReport[]
+  rankings        CategoryRanking[]
 
   // Índices para búsquedas y filtros ultrarrápidos con bajo consumo de memoria
   @@index([ean])
+  @@index([asin])
   @@index([categoryId])
   @@index([brandId])
+  @@index([isBestseller])
   @@map("products")
+}
+
+// Modelo de Rankings por Categoría (para páginas de más vendidos 1..200 en Amazon España)
+model CategoryRanking {
+  id         String   @id @default(cuid())
+  categoryId String   @map("category_id")
+  productId  String   @map("product_id")
+  position   Int      // Posición en el ranking: 1, 2, 3... 200
+  source     String   @default("AMAZON_ES") // Fuente del ranking
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([categoryId, position])
+  @@unique([categoryId, productId])
+  @@index([categoryId, position])
+  @@map("category_rankings")
 }
 
 model NutritionalInfo {
@@ -69,6 +102,10 @@ model NutritionalInfo {
   servingSize          String?  @map("serving_size") // Ej: "30g" o "5g"
   proteinPer100g       Float?   @map("protein_per_100g")
   creatinePerServing   Float?   @map("creatine_per_serving") // Gramos de creatina por dosis
+  bcaaPerServing       Float?   @map("bcaa_per_serving") // Gramos de BCAA por toma (clave para BCAAs)
+  omega3EpaMg          Float?   @map("omega3_epa_mg") // Miligramos de EPA por dosis (clave para Omega-3)
+  omega3DhaMg          Float?   @map("omega3_dha_mg") // Miligramos de DHA por dosis (clave para Omega-3)
+  magnesiumType        String?  @map("magnesium_type") // Forma: "Bisglicinato", "Citrato", "Malato", "Óxido"
   carbsPer100g         Float?   @map("carbs_per_100g")
   sugarsPer100g        Float?   @map("sugars_per_100g")
   fatPer100g           Float?   @map("fat_per_100g")

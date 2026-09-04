@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { SupplementProduct, CategoryType } from '../types';
 import { getNutriScoreColorClass } from '../utils/nutriscore';
+import { normalizeProductRanks } from '../utils/productRanking';
 
 interface RankingsViewProps {
   products: SupplementProduct[];
@@ -28,13 +29,24 @@ export const RankingsView: React.FC<RankingsViewProps> = ({
   comparisonIds,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<CategoryType>('Proteína');
+  const [sortBy, setSortBy] = useState<'bestseller' | 'nutriscore'>('bestseller');
 
   const categories: CategoryType[] = ['Proteína', 'Creatina', 'Pre-Entreno', 'Multivitamínico', 'Magnesio', 'Omega-3', 'Aminoácidos'];
 
-  // Filter and sort by NutriScore descending
-  const categoryProducts = products
+  const normalizedProducts = normalizeProductRanks(products);
+
+  // Filter and sort by Amazon Best-Seller Rank (ascending) or NutriScore (descending)
+  const categoryProducts = normalizedProducts
     .filter((p) => p.category === selectedCategory)
-    .sort((a, b) => b.nutriScore - a.nutriScore);
+    .sort((a, b) => {
+      if (sortBy === 'bestseller') {
+        const rankA = a.bestsellerRank ?? a.rank ?? 9999;
+        const rankB = b.bestsellerRank ?? b.rank ?? 9999;
+        if (rankA !== rankB) return rankA - rankB;
+        return b.nutriScore - a.nutriScore;
+      }
+      return b.nutriScore - a.nutriScore;
+    });
 
   const top3 = categoryProducts.slice(0, 3);
   const remaining = categoryProducts.slice(3);
@@ -60,21 +72,46 @@ export const RankingsView: React.FC<RankingsViewProps> = ({
             </p>
           </div>
 
-          {/* Category Selector Pills */}
-          <div className="flex flex-wrap gap-1.5 p-1.5 bg-[#f2f4f6] rounded-2xl">
-            {categories.map((cat) => (
+          {/* Category Selector Pills & Sort Toggle */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex flex-wrap gap-1.5 p-1.5 bg-[#f2f4f6] rounded-2xl">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    selectedCategory === cat
+                      ? 'bg-white text-[#191c1e] shadow-xs'
+                      : 'text-[#45464d] hover:text-[#191c1e]'
+                  }`}
+                >
+                  {cat === 'Proteína' ? 'Proteínas (Whey)' : cat}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-1 p-1 bg-[#f2f4f6] rounded-2xl self-start sm:self-auto">
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                  selectedCategory === cat
-                    ? 'bg-white text-[#191c1e] shadow-xs'
+                onClick={() => setSortBy('bestseller')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  sortBy === 'bestseller'
+                    ? 'bg-[#006c49] text-white shadow-xs'
                     : 'text-[#45464d] hover:text-[#191c1e]'
                 }`}
               >
-                {cat === 'Proteína' ? 'Proteínas (Whey)' : cat}
+                Top Ventas Amazon
               </button>
-            ))}
+              <button
+                onClick={() => setSortBy('nutriscore')}
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  sortBy === 'nutriscore'
+                    ? 'bg-[#006c49] text-white shadow-xs'
+                    : 'text-[#45464d] hover:text-[#191c1e]'
+                }`}
+              >
+                Por NutriScore
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -85,7 +122,7 @@ export const RankingsView: React.FC<RankingsViewProps> = ({
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-bold uppercase tracking-wider text-[#76777d] font-label-caps flex items-center gap-2">
               <Crown className="w-4 h-4 text-[#006c49]" />
-              Podio de Excelencia Clínica ({selectedCategory})
+              {sortBy === 'bestseller' ? `Top 3 Más Vendidos (${selectedCategory})` : `Podio de Excelencia Clínica (${selectedCategory})`}
             </h2>
           </div>
 

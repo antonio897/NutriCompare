@@ -69,7 +69,7 @@ export default function App() {
     }
   }, [dbProducts]);
 
-  const categories: CategoryType[] = ['Creatina', 'Proteína', 'Pre-Entreno', 'Multivitamínico', 'Magnesio', 'Omega-3', 'Aminoácidos'];
+  const categories: CategoryType[] = ['Creatina', 'Proteína', 'BCAA', 'Magnesio', 'Omega-3', 'Pre-Entreno', 'Multivitamínico'];
 
   // Toggle supplement in comparison (máximo 4)
   const handleToggleCompare = (id: string) => {

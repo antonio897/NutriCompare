@@ -9,6 +9,10 @@ export const SUPPLEMENT_PRODUCTS: SupplementProduct[] = [
     category: 'Creatina',
     nutriScore: 9.8,
     scoreGrade: 'Grado A+',
+    isBestseller: true,
+    bestsellerRank: 1,
+    rating: 4.8,
+    ratingsTotal: 21300,
     image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDeJxIwboxJjXzeSSwdOZjWFaqlKuPYgsKAtLE_yKoe9J1zZ4u00gbCXcGTkmE_xPWZdRErPeFS9bM6waDkD5AYPY4nKgeFBJ-tGj1Pqn4czK8L05I6KgXGkrOKFD9Q_WVhH_i8POjx8PhgOpWPdr3W5ruvCHW_LfIFRPXFhBYG3hdJFvdzL3lJh2FLgJz2fBnkEz9RaRU3wb7i17wisBiOkXW7urI8WmS9Fkfg-cl-H4SQ0kK7zs3U',
     gallery: [
       'https://lh3.googleusercontent.com/aida-public/AB6AXuA27OVTVTg84YFzTr2P2n64PD3U-YYxT2Dp2TOdyqtviL67imUXG5kVF5UL8cOdd4iUabgEbXYxwcm1VcqImQMJRssy6s_ecCu7zbI6Wer78qmbCkEUXS0JMqxHuX1y0wsiUHiAkErio55SOe2rwt_S4dVUMSuUTACp7Z0Aw5kmUEl01A3gbPAzFsfH3qqdfAnx5SSYNiXTENGOu3i2UJGjZlenfiE_YaVHDY-TKfuFVcXxthmOCQHs',
