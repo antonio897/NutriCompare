@@ -8,10 +8,11 @@ coverage/
 !.env.example
 .vercel
 
-# Data dumps y archivos pesados de Open Food Facts
+# Data dumps y archivos pesados de cosecha local
 *.jsonl
 *.jsonl.gz
 *.gz
-data/
+/data/
 *.csv
 .sf/
+!src/data/**
